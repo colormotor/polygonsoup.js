@@ -1,0 +1,17 @@
+{
+  "name": "polygonsoup",
+  "version": "1.0.0",
+  "dependencies": {
+    "numericjs":"1.2.6",
+    "lodash":"4.17.15",
+    "p5":"1.4.0"
+  },
+  "exports": {
+    "./geom": "./geom.js",
+    "./mth": "./mth.js",
+    "./alg": "./alg.js",
+    "./p5ut": "./p5ut.js",
+    "./lqt": "./lqt.js",
+    "./package.json": "./package.json"
+  }
+}
