@@ -17,36 +17,35 @@ const alg = require("./alg.js");
 
 const _ = require("lodash");
 
-const geom = function() {};
+const geom = function() { };
 
-geom.cleanup_contour = (X, closed=false, eps=1e-10, get_inds=false) => {
-    // Removes points that are closer then a threshold eps
-    if (closed)
-      X = X.concat([X[0]]);
-    var D = mth.diff(X, 0);
-    var inds = _.range(0, X.length);
-    // chord lengths
-    var s = D.map((d)=>d[0]**2 + d[1]**2);
+geom.cleanup_contour = (X, closed = false, eps = 1e-10, get_inds = false) => {
+  // Removes points that are closer then a threshold eps
+  if (closed)
+    X = X.concat([X[0]]);
+  var D = mth.diff(X, 0);
+  var inds = _.range(0, X.length);
+  // chord lengths
+  var s = D.map((d) => d[0] ** 2 + d[1] ** 2);
 
-    // Delete values in input with zero distance
-    var Y = [X[0]];
-    var inds = [0];
+  // Delete values in input with zero distance
+  var Y = [X[0]];
+  var inds = [0];
 
-  for (var i = 0; i < s.length; i++){
+  for (var i = 0; i < s.length; i++) {
     if (s[i] <= eps)
       continue;
-    Y.push(X[i+1]);
-    inds.push(i+1);
+    Y.push(X[i + 1]);
+    inds.push(i + 1);
   }
-    if (closed)
-    {
-      Y = X.slice(0, Y.length-1);
-      inds = inds.slice(0, inds.length-1);
-    }
+  if (closed) {
+    Y = X.slice(0, Y.length - 1);
+    inds = inds.slice(0, inds.length - 1);
+  }
 
-    if (get_inds)
-        return [Y, inds];
-    return Y;
+  if (get_inds)
+    return [Y, inds];
+  return Y;
 }
 
 // def chord_lengths( P, closed=0 ):
@@ -82,13 +81,13 @@ geom.schematize = function(P_, C, angle_offset, closed = false, get_edge_inds = 
     return [x, y, w];
   }
 
-  const line_intersection = (s0, s1, eps=1e-10) => {
+  const line_intersection = (s0, s1, eps = 1e-10) => {
     let sp0 = mth.cross([...s0[0], ...[1.0]], [...s0[1], ...[1.0]]);
     let sp1 = mth.cross([...s1[0], ...[1.0]], [...s1[1], ...[1.0]]);
     let ins = mth.cross(sp0, sp1);
     if (Math.abs(ins[2]) < eps)
-        return [false, [0,0]];
-    return [true, [ins[0]/ins[2], ins[1]/ins[2]]];
+      return [false, [0, 0]];
+    return [true, [ins[0] / ins[2], ins[1] / ins[2]]];
   }
 
   const project_on_line = (p, a, b) => {
@@ -102,10 +101,10 @@ geom.schematize = function(P_, C, angle_offset, closed = false, get_edge_inds = 
   }
 
   const cost = (V, n) => {
-    let b  = mth.mean(V, 0);
+    let b = mth.mean(V, 0);
     let bn = mth.dot(b, n);
-    let c  = 0.0;
-    for (const v of V){
+    let c = 0.0;
+    for (const v of V) {
       let ct = mth.dot(v, n) - bn;
       c += ct * ct;
     }
@@ -113,13 +112,13 @@ geom.schematize = function(P_, C, angle_offset, closed = false, get_edge_inds = 
   }
 
   const best_cost = (V, N) => {
-    let costs = N.map((n)=>cost(V, n));
+    let costs = N.map((n) => cost(V, n));
     return mth.argmin(costs);
   }
 
   const merge = (blocks, b0, b1, N) => {
     if (b0.best != b1.best)
-        return b1;
+      return b1;
     b0.V = [...b0.V, ...b1.V.slice(1)]; // sum(b0.V, b1.V.slice(1)); //[1:]
     b0.best = best_cost(b0.V, N);
     blocks.remove(b1);
@@ -201,20 +200,20 @@ geom.schematize = function(P_, C, angle_offset, closed = false, get_edge_inds = 
         //   console.log('Nan ins');
         edge_inds.push(block.edge_index);
       }
-     }else {
-        Q.push(project_on_line(block.V[0], b, mth.add(b, d)));
-        // if (has_nan(Q[Q.length-1]))
-        //  console.log('Nan proj');
-        edge_inds.push(block.edge_index);
+    } else {
+      Q.push(project_on_line(block.V[0], b, mth.add(b, d)));
+      // if (has_nan(Q[Q.length-1]))
+      //  console.log('Nan proj');
+      edge_inds.push(block.edge_index);
     }
 
-      prev = block;
-      b_prev = b;
-      d_prev = d;
-      block = block.next;
+    prev = block;
+    b_prev = b;
+    d_prev = d;
+    block = block.next;
   }
   //console.log(Q);
-  Q.push(project_on_line(blocks.back.V[blocks.back.V.length-1], b, mth.add(b, d)));
+  Q.push(project_on_line(blocks.back.V[blocks.back.V.length - 1], b, mth.add(b, d)));
   // if (has_nan(Q[Q.length-1]))
   //   console.log('Nan end');
   edge_inds.push(blocks.back.edge_index);
@@ -237,12 +236,12 @@ geom.schematize = function(P_, C, angle_offset, closed = false, get_edge_inds = 
   return Q;
 }
 
-geom.random_radial_polygon = (n, min_r, max_r, center=[0,0]) => {
+geom.random_radial_polygon = (n, min_r, max_r, center = [0, 0]) => {
   let R = mth.uniform(min_r, max_r, n);
-  let start = mth.uniform(0, Math.PI*2);
-  let Theta = mth.randspace(start, start+Math.PI*2, n+1).slice(0, -1);
+  let start = mth.uniform(0, Math.PI * 2);
+  let Theta = mth.randspace(start, start + Math.PI * 2, n + 1).slice(0, -1);
   var res = mth.transpose([mth.add(mth.mul(mth.cos(Theta), R), center[0]),
-                    mth.add(mth.mul(mth.sin(Theta), R), center[0])]);
+  mth.add(mth.mul(mth.sin(Theta), R), center[0])]);
   return res;
 }
 

@@ -1,0 +1,14 @@
+#+title: Polygonsoup.JS
+Polygonsoup, javascript port of various plotter-friendly utilities
+
+* Usage
+Link each module locally using its name, without the ".js", e.g.
+#+begin_example javascript
+const mth = require("polygonsoup/mth");
+#+end_example
+
+* Dependencies
+To install dependencies use
+#+begin_example
+npm i
+#+end_example

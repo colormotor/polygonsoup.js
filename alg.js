@@ -10,7 +10,7 @@
  **/
 
 'use strict';
-const alg = function() {}
+const alg = function() { }
 
 alg.DoublyLinkedList = function() {
   this.front = null;
@@ -25,7 +25,7 @@ alg.DoublyLinkedList = function() {
     console.log("Hello");
   }
 
-  this.add = (elem, at=null) => {
+  this.add = (elem, at = null) => {
     elem.prev = null;
     elem.next = null;
     if (this.back == null) {
@@ -43,7 +43,7 @@ alg.DoublyLinkedList = function() {
     at.next = elem;
   }
 
-  this.insert = (elem, at=null) => {
+  this.insert = (elem, at = null) => {
     elem.prev = null;
     elem.next = null;
     if (this.back == null) {
@@ -104,15 +104,15 @@ alg.DoublyLinkedList = function() {
 
   this.remove = (elem) => {
     if (elem == this.front)
-            return this.pop_front();
+      return this.pop_front();
     if (elem == this.back)
-            return this.pop_back();
+      return this.pop_back();
     // should have prev and next since it isnt front or back
     if (elem.next != null)
-        elem.next.prev = elem.prev;
+      elem.next.prev = elem.prev;
 
     if (elem.prev != null)
-        elem.prev.next = elem.next;
+      elem.prev.next = elem.next;
 
     elem.prev = elem.next = null;
     return elem;
@@ -120,8 +120,8 @@ alg.DoublyLinkedList = function() {
 }
 
 alg.DoublyLinkedList.Node = function() {
-    this.prev = null;
-    this.next = null;
+  this.prev = null;
+  this.next = null;
 }
 
 module.exports = alg;

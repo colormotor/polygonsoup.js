@@ -71,7 +71,7 @@ lqt.discretize_system = (A, B, dt, method = discretization_default) => {
   if (method == 'exact') {
     const dim = mth.dim(A)[0];
     var Ad = mth.zeros(dim, dim);
-    for (var i = 0; i < dim; i++){
+    for (var i = 0; i < dim; i++) {
       //mth.print(mth.diag(mth.ones(dim), i))
       Ad = mth.add(Ad, mth.mul(mth.shiftmat(dim, i), Math.pow(dt, i) * (1 / factorial[i])));
     }
@@ -470,23 +470,22 @@ lqt.cartesian_reference = (sys, P, Sigma, activation_sigma = 0.5,
 /// Create LQT trajectory with tied covariances
 lqt.tied_lqt = function(
   P,
-  params={})
-  {
-    if (params.angle==undefined) params.angle = 30;
-    if (params.isotropy==undefined) params.isotropy = 0.5;
-    if (params.sigma==undefined) params.sigma = 3;
-    if (params.activation_sigma==undefined) params.activation_sigma = 0.5;
-    if (params.d==undefined) params.d = 5;
-    if (params.order==undefined) params.order = 4;
-    if (params.segment_duration==undefined) params.segment_duration = 0.5;
-    if (params.opt_x0==undefined) params.opt_x0 = true;
-    if (params.stop_movement==undefined) params.stop_movement = true;
-    if (params.periodic==undefined) params.periodic = true;
-    if (params.subd==undefined) params.subd = 5;
-    if (params.subsample==undefined) params.subsample = 4;
-    if (params.dim==undefined) params.dim = 2;
+  params = {}) {
+  if (params.angle == undefined) params.angle = 30;
+  if (params.isotropy == undefined) params.isotropy = 0.5;
+  if (params.sigma == undefined) params.sigma = 3;
+  if (params.activation_sigma == undefined) params.activation_sigma = 0.5;
+  if (params.d == undefined) params.d = 5;
+  if (params.order == undefined) params.order = 4;
+  if (params.segment_duration == undefined) params.segment_duration = 0.5;
+  if (params.opt_x0 == undefined) params.opt_x0 = true;
+  if (params.stop_movement == undefined) params.stop_movement = true;
+  if (params.periodic == undefined) params.periodic = true;
+  if (params.subd == undefined) params.subd = 5;
+  if (params.subsample == undefined) params.subsample = 4;
+  if (params.dim == undefined) params.dim = 2;
   var Sigma = [];
-    var cov = mth.mul(mth.eye(params.dim), params.sigma ** 2);
+  var cov = mth.mul(mth.eye(params.dim), params.sigma ** 2);
   mth.set_submat(cov, [0, 2], [0, 2], lqt.make_cov_2d(mth.radians(params.angle), [params.isotropy * params.sigma, params.sigma]));
   for (const p of P)
     Sigma.push(cov);
@@ -503,18 +502,18 @@ lqt.tied_lqt = function(
   return x;
 }
 
-lqt.evolute = (X, get_radii=true) => {
+lqt.evolute = (X, get_radii = true) => {
   X = mth.transpose(X);
 
-  var [x, y] = X.slice(0,2);
-  var [dx, dy] = X.slice(2,4);
-  var [ddx, ddy] = X.slice(4,6);
+  var [x, y] = X.slice(0, 2);
+  var [dx, dy] = X.slice(2, 4);
+  var [ddx, ddy] = X.slice(4, 6);
 
   var dxy2 = mth.add(mth.mul(dx, dx), mth.mul(dy, dy));
   var dddxy = mth.sub(mth.mul(dx, ddy), mth.mul(ddx, dy));
 
   var r = mth.div(mth.pow(dxy2, 3 / 2),
-                  mth.abs(dddxy));
+    mth.abs(dddxy));
 
   x = mth.sub(x, mth.div(mth.mul(dxy2, dy), dddxy));
   y = mth.add(y, mth.div(mth.mul(dxy2, dx), dddxy));
@@ -537,7 +536,7 @@ lqt.test = () => {
   // mth.print(mth.block_diag([mth.eyev(2, 1), mth.eyev(2, 2)]))
   var sys = new lqt.LinearSystem(4, 5)
   var [Ad, Bd] = sys.discretize()
-  mth.print(mth.shiftmat(4,-2))
+  mth.print(mth.shiftmat(4, -2))
   //mth.print(mth.set_submat(mth.zeros(5,5), [0,3], [0,3], mth.eye(3)));//, mth.eye(2) ));
 }
 
