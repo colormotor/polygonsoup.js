@@ -21,6 +21,34 @@ const ArrayT = Array; // Float64Array;
 // Rare docs for numericjs
 // https://ccc-js.github.io/numeric2/documentation.html
 
+mth.is_number = (v) => typeof(v) == 'number';
+
+mth.matmul = () => {
+  var m = arguments[0];
+  for (var i = 1; i < arguments.length; i++)
+    m = mth.dot(m, arguments[i]);
+  return m;
+}
+
+mth.slice = () => {
+  if (arguments.length==1)
+    return arguments[0];
+  if (arguments.length==2){
+    var [v, to] = arguments;
+    var from = 0;
+  }else if(arguments.length==3){
+    var [v, from, to] = arguments;
+  }
+
+  if (from < 0)
+    from = v.length + from;
+  if (to < 0)
+    to = v.length + to;
+  return v.slice(from, to);
+}
+
+mth.neg = (v) => mth.mul(v, -1);
+
 mth.eyev = (n, v) => {
   var res = mth.zeros(n, n);
   for (var i = 0; i < n; i++)
