@@ -459,7 +459,7 @@ lqt.cartesian_reference = (sys, P, Sigma, activation_sigma = 0.5,
       var i = (n - 1) * cDim;
       // Q[i+dim:i+cDim,i+dim:i+cDim] = mth.eye(cDim-dim)
       // Q[i:i+dim,i:i+dim] = mth.eye(dim)*1 #100
-      mth.set_submat(Q, [i + dim, i + cDim], [i + dim, i + cDim], mth.eye(cDim - dim));
+      mth.set_submat(Q, [i + dim, i + cDim], [i + dim, i + cDim], mth.eyev(cDim - dim, 1));
       mth.set_submat(Q, [i, i + dim], [i, i + dim], mth.eyev(dim, 1));
     }
   }
