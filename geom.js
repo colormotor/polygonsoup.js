@@ -19,34 +19,6 @@ const _ = require("lodash");
 
 const geom = function() { };
 
-/// Removes contour points that are closer then eps
-geom.cleanup_contour = (X, closed = false, eps = 1e-10, get_inds = false) => {
-  if (closed)
-    X = X.concat([X[0]]);
-  var D = mth.diff(X, 0);
-  var inds = _.range(0, X.length);
-  // chord lengths
-  var s = D.map((d) => d[0] ** 2 + d[1] ** 2);
-
-  // Delete values in input with zero distance
-  var Y = [X[0]];
-  var inds = [0];
-
-  for (var i = 0; i < s.length; i++) {
-    if (s[i] <= eps)
-      continue;
-    Y.push(X[i + 1]);
-    inds.push(i + 1);
-  }
-  if (closed) {
-    Y = X.slice(0, Y.length - 1);
-    inds = inds.slice(0, inds.length - 1);
-  }
-
-  if (get_inds)
-    return [Y, inds];
-  return Y;
-}
 
 /// Chord lengths for each segment of a contour
 geom.chord_lengths = ( P, closed=0 ) => {
@@ -78,13 +50,82 @@ geom.is_compound = (S) => {
   return false;
 }
 
+geom.point_line_distance = (p, a, b) => {
+  if (mth.distance(a, b) < mth.zero_eps)  // check for degenerate line
+    return mth.distance(a, p);
+  return Math.abs(mth.det([mth.sub(b, a), mth.sub(a, p)])) / mth.distance(b, a);
+}
+
+geom.point_segment_distance = ( p,a,b) => {
+  const d    = mth.sub(b, a);
+  const u    = mth.clamp(mth.dot(mth.sub(p, a), d) / mth.dot(d, d), 0, 1);
+  const proj = mth.add(a, mth.mul(u, d));
+  return mth.distance(proj, p);
+}
+
+geom.project_on_line = (p, a, b) => {
+    let d = mth.sub(b, a)
+    let t = mth.dot(mth.sub(p, a), d) / mth.dot(d, d);
+    return mth.add(a, mth.mul(mth.sub(b, a), t));
+}
+
+geom.rot_2d = (theta, affine=true ) => {
+    if (affine)
+      var d = 3;
+    else
+      var d = 2;
+
+    m = mth.eye(d)
+    ct = Math.cos(theta)
+    st = Math.sin(theta)
+    m[0][0] = ct; m[0][1] = -st
+    m[1][0] = st; m[1][1] = ct
+    return m
+}
+
+geom.trans_2d = ( xy) => {
+    var m = mth.eye(3);
+    m[0][2] = xy[0]
+    m[1][2] = xy[1]
+    return m
+}
+
+geom.scaling_2d = ( xy, affine=true ) => {
+    if (affine)
+      var d = 3;
+    else
+      var d = 2;
+
+    if (mth.is_number(xy))
+      xy = [xy, xy]
+
+    var m = mth.eye(d)
+    m[0][0] = xy[0]
+    m[1][1] = xy[1]
+    return m
+}
+
+geom.shear_2d = (xy, affine=true) => {
+    if (affine)
+      var d = 3;
+    else
+      var d = 2;
+
+    var m = mth.eye(d)
+    m[0][1] = xy[0]
+    m[1][0] = xy[1]
+    return m
+}
+
 const affine_transform = (mat, data) => {
-  if (mth.dim(data)==2)
-    return mth.slice( mth.dot(mat, data.concat([1.0])), -1 );
+  if (mth.dim(data).length==1){
+    return mth.slice(mth.dot(mat, data.concat([1.0])), -1 );
+  }
   if (!geom.is_compound(data)){
     var n = data.length;
-    return mth.transpose(
-      mth.slice( mth.dot(mat, mth.vstack(mth.transpose(data), mth.ones(n))), -1));
+    var res = mth.transpose(
+      mth.slice( mth.dot(mat, mth.vstack([mth.transpose(data), [mth.ones(n)]])), -1));
+    return res;
   }
   // compound
   return data.map(P=>affine_transform(mat, P));
@@ -98,11 +139,11 @@ geom.bounding_box = (S, padding=0) => {
   if (!S.length)
     return [[0,0], [0,0]];
 
-  if (!is_compound(S))
+  if (!geom.is_compound(S))
     S = [S];
 
-  bmin = mth.min(S.map(V=>mth.min(V, 0)), 0);
-  bmin = mth.max(S.map(V=>mth.max(V, 0)), 0);
+  var bmin = mth.min(S.map(V=>mth.min(V, 0)), 0);
+  var bmax = mth.max(S.map(V=>mth.max(V, 0)), 0);
   return [mth.sub(bmin, padding), mth.add(bmax, padding)]
 }
 
@@ -118,8 +159,8 @@ geom.pad_rect = (rect, pad) => {
   return [mth.add(rect[0], pad), mth.sub(rect[1], pad)];
 }
 
-geom.rect_size = (rect) => mth.sub(rect[1] - rect[0]);
-geom.rect_aspect = (rect) => mth.sub(rect[0] - rect[1]);
+geom.rect_size = (rect) => mth.sub(rect[1], rect[0]);
+geom.rect_aspect = (rect) => mth.div(rect[0], rect[1]);
 geom.rect_w = (rect) => geom.rect_size(rect)[0];
 geom.rect_h = (rect) => geom.rect_size(rect)[0];
 geom.rect_center = (rect) => mth.add(rect[0], mth.div(mth.sub(rect[1], rect[0]), 2));
@@ -205,6 +246,18 @@ geom.rect_in_rect_transform = (src, dst, padding=0., axis=None) => {
   return M;
 }
 
+geom.rect_to_rect_transform = (src, dst) => {
+  var [sw, sh] = geom.rect_size(src)
+  var [dw, dh] = geom.rect_size(dst)
+
+  var m = geom.trans_2d([dst[0][0], dst[0][1]])
+  m = mth.dot(m, geom.scaling_2d([dw/sw,dh/sh]))
+  m = mth.dot(m, geom.trans_2d([-src[0][0],-src[0][1]]))
+
+  return m
+}
+
+
 // Intersections and all
 geom.line_intersection = (s0, s1, eps = 1e-10) => {
   let sp0 = mth.cross([...s0[0], ...[1.0]], [...s0[1], ...[1.0]]);
@@ -213,12 +266,6 @@ geom.line_intersection = (s0, s1, eps = 1e-10) => {
   if (Math.abs(ins[2]) < eps)
     return [false, [0, 0]];
   return [true, [ins[0] / ins[2], ins[1] / ins[2]]];
-}
-
-geom.project_on_line = (p, a, b) => {
-    let d = mth.sub(b, a)
-    let t = mth.dot(mth.sub(p, a), d) / mth.dot(d, d);
-    return mth.add(a, mth.mul(mth.sub(b, a), t));
 }
 
 
@@ -299,6 +346,85 @@ geom.random_radial_polygon = (n, min_r, max_r, center = [0, 0]) => {
 
 
 /**
+ * Remove points along a contour that are closer together than eps
+ * @param {Array} X contour
+ * @param {bool} closed true if contour is closed
+ * @param {number} eps min distance
+ * @param {bool} get_inds get cleaned up contour indices
+ * @returns cleaned up contour and (optionally) indices
+ */
+geom.cleanup_contour = (X, closed = false, eps = 1e-10, get_inds = false) => {
+  if (closed)
+    X = X.concat([X[0]]);
+  var D = mth.diff(X, 0);
+  var inds = _.range(0, X.length);
+  // chord lengths
+  var s = D.map((d) => d[0] ** 2 + d[1] ** 2);
+
+  // Delete values in input with zero distance
+  var Y = [X[0]];
+  var inds = [0];
+
+  for (var i = 0; i < s.length; i++) {
+    if (s[i] <= eps)
+      continue;
+    Y.push(X[i + 1]);
+    inds.push(i + 1);
+  }
+  if (closed) {
+    Y = X.slice(0, Y.length - 1);
+    inds = inds.slice(0, inds.length - 1);
+  }
+
+  if (get_inds)
+    return [Y, inds];
+  return Y;
+}
+
+const dp_simplify = (X, eps) => {
+  var dmax  = 0.0;
+  var   index = 0;
+  var   n     = X.length;
+  for (var i = 0; i < n; i++) {
+    const d = geom.point_line_distance(X[i], X[0], X[n - 1]);
+
+    if (d > dmax) {
+      index = i;
+      dmax  = d;
+    }
+  }
+
+  if (dmax >= eps) {
+    const x1 = dp_simplify(X.slice(0, index+1), eps);
+    const x2 = dp_simplify(X.slice(index, X.length), eps);
+    return mth.vstack([x1.slice(0, x1.length-1), x2]);
+  } else {
+    return [X[0], X[X.length-1]];
+  }
+}
+
+/**
+ * Ramer-Douglas-Peucker polyline simplification (sorry Rammer)
+ * @param {any} X
+ * @param {any} eps
+ * @param {bool} closed
+ * @returns simplified polyline
+ */
+geom.dp_simplify = (X, eps, closed=false)  => {
+  if (eps <= 0.) return ctr;
+
+  if (closed)
+    X = mth.vstack([X, [X[0]]]);
+
+  var Y = dp_simplify(X, eps);
+
+  if (closed) {
+    Y = Y.slice(0, Y.length-1);
+  }
+  return Y;
+}
+
+/**
  * schematize - C-oriented polyline schematization.
  * Quick and dirty implementation of angular schematization as in:
  * Dwyer et al. (2008) A fast and simple heuristic for metro map path simplification
@@ -330,6 +456,12 @@ geom.schematize = (P_, C, angle_offset, closed = false, get_edge_inds = false, m
     blocks.remove(b1);
     return b0
   }
+
+  if (C < 1)
+    if (get_edge_inds)
+      return P_, _.range(0, P_.length);
+    else
+      return P_;
 
   let P = [...P_];
   if (closed)

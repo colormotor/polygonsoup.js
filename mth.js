@@ -16,6 +16,11 @@ var mth = require("numericjs");
 const _ = require("lodash");
 mth.rand = Math.random
 mth.eye = mth.identity;
+mth.norm = mth.norm2;
+
+mth.zero_eps = 1e-15;
+
+const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 
 const ArrayT = Array; // Float64Array;
 // Rare docs for numericjs
@@ -30,7 +35,7 @@ mth.matmul = () => {
   return m;
 }
 
-mth.slice = () => {
+mth.slice = function() {
   if (arguments.length==1)
     return arguments[0];
   if (arguments.length==2){
@@ -324,16 +329,23 @@ mth.rotate_array = function(ar, n) {
   return ar.slice(n, ar.length).concat(ar.slice(0, n));
 }
 
-mth.min = (ar) => {
+mth.min = (ar, axis=0) => {
   if (mth.dim(ar).length > 1) {
-    return Math.min.apply(null, ar.map((row) => Math.min.apply(null, row)));
+    if (axis==0)
+      return mth.min(mth.transpose(ar), axis=1);
+    else
+      return ar.map(row=>Math.min.apply(null, row));
   }
   return Math.min.apply(null, ar);
 }
 
-mth.max = (ar) => {
+
+mth.max = (ar, axis=0) => {
   if (mth.dim(ar).length > 1) {
-    return Math.max.apply(null, ar.map((row) => Math.max.apply(null, row)));
+    if (axis==0)
+      return mth.max(mth.transpose(ar), axis=1);
+    else
+      return ar.map(row=>Math.max.apply(null, row));
   }
   return Math.max.apply(null, ar);
 }
