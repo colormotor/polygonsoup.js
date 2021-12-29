@@ -20,6 +20,7 @@ mth.norm = mth.norm2;
 
 mth.zero_eps = 1e-15;
 
+mth.randint = (min, max) => Math.floor(mth.rand() * (max - min) ) + min;
 const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 
 const ArrayT = Array; // Float64Array;
@@ -367,8 +368,8 @@ mth.quantize = (v, step) => Math.round(v / step) * step;
 mth.dist2sq = (a, b) => (b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]);
 
 mth.min3 = (a, b, c) => {
-  if (Math.abs(c - a) < 1e-5 && Math.abs(c - b) < 1e-15)
-    return c;
+  // if (Math.abs(c - a) < 1e-5 && Math.abs(c - b) < 1e-15)
+  //   return c;
 
   var m = a;
   if (b <= m)
@@ -379,8 +380,8 @@ mth.min3 = (a, b, c) => {
 }
 
 mth.argmin3 = (a, b, c) => {
-  if (Math.abs(c - a) < 1e-5 && Math.abs(c - b) < 1e-15)
-    return 2;
+  // if (Math.abs(c - a) < 1e-5 && Math.abs(c - b) < 1e-15)
+  //   return 2;
 
   var m = a;
   var i = 0;
