@@ -14,13 +14,24 @@
 'use strict';
 var mth = require("numericjs");
 const _ = require("lodash");
-mth.rand = Math.random
+var seedrandom = require('seedrandom');
+
+var rng = seedrandom();
+
+mth.random_seed = (v) => {
+  rng = seedrandom(v);
+  mth.rand = rng;
+}
+
+mth.rand = rng; //Math.random
 mth.eye = mth.identity;
 mth.norm = mth.norm2;
 
 mth.zero_eps = 1e-15;
 
 mth.randint = (min, max) => Math.floor(mth.rand() * (max - min) ) + min;
+mth.random_choice = (ar) => ar[mth.randint(0, ar.length)]
+
 const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 
 const ArrayT = Array; // Float64Array;
@@ -229,6 +240,15 @@ mth.uniform = (a = 0.0, b = 1.0, n = 1) => {
   return v;
 }
 
+mth.shuffled = (array) => {
+  array = array.slice(0);
+    for (let i = array.length - 1; i > 0; i--) {
+        let j = Math.floor(mth.rand() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+  return array;
+}
+
 const sum1 = mth.sum;
 mth.sum = (x, axis = -1) => {
   const shape = mth.dim(x);
@@ -367,8 +387,9 @@ mth.quantize = (v, step) => Math.round(v / step) * step;
 
 mth.dist2sq = (a, b) => (b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]);
 
+const min_eps = 0.1;
 mth.min3 = (a, b, c) => {
-  // if (Math.abs(c - a) < 1e-5 && Math.abs(c - b) < 1e-15)
+  // if (Math.abs(c - a) < min_eps && Math.abs(c - b) < min_eps)
   //   return c;
 
   var m = a;
@@ -380,7 +401,7 @@ mth.min3 = (a, b, c) => {
 }
 
 mth.argmin3 = (a, b, c) => {
-  // if (Math.abs(c - a) < 1e-5 && Math.abs(c - b) < 1e-15)
+  // if (Math.abs(c - a) < min_eps && Math.abs(c - b) < min_eps)
   //   return 2;
 
   var m = a;
@@ -484,11 +505,11 @@ mth.dtw_path_all = (x, y, w = Infinity) => {
   var ny = y.length;
   var mind = Infinity;
 
-  for (var i = 0; i < ny; i++)
+  for (var i = 0; i < ny-1; i++)
     dists.push(mth.dtw_dist(x, mth.rotate_array(y, i), w));
   var start_index = mth.argmin(dists);
   var path = mth.dtw_path(x, mth.rotate_array(y, start_index), w);
-  path = path.map((r) => [r[0], mth.imod(r[1] + start_index, ny)]);
+  path = path.map((r) => [r[0], (r[1] + start_index)%ny]);
   return path;
 }
 
