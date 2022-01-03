@@ -333,13 +333,23 @@ geom.ray_segment_intersection = (a1, a2, b1, b2) => {
 }
 
 
-geom.random_radial_polygon = (n, min_r, max_r, center = [0, 0]) => {
+geom.shapes = function() {}
+geom.shapes.random_radial_polygon = (n, min_r, max_r, center = [0, 0]) => {
   let R = mth.uniform(min_r, max_r, n);
   let start = mth.uniform(0, Math.PI * 2);
-  let Theta = mth.randspace(start, start + Math.PI * 2, n + 1).slice(0, -1);
+  let Theta = mth.randspace(start, start + Math.PI * 2, n + 1).slice(0, n);
   var res = mth.transpose([mth.add(mth.mul(mth.cos(Theta), R), center[0]),
   mth.add(mth.mul(mth.sin(Theta), R), center[1])]);
   return res;
+}
+
+geom.shapes.star = (cenp, r, n=5, ratio_inner=1) => {
+  const R  = [r / (1.618033988749895 + 1) * ratio_inner, r];
+  const theta = mth.add(mth.linspace(0, Math.PI * 2, n * 2 + 1), Math.PI / (n * 2)).slice(0, n*2);
+  var P = [];
+  for (var i = 0; i < theta.length; i++)
+    P.push([Math.cos(theta[i]) * R[i % 2] + cenp[0], Math.sin(theta[i]) * R[i % 2] + cenp[1]]);
+  return P;
 }
 
 
@@ -540,20 +550,15 @@ geom.schematize = (P_, C, angle_offset, closed = false, get_edge_inds = false, m
   Q.push(geom.project_on_line(blocks.back.V[blocks.back.V.length - 1], b, mth.add(b, d)));
   edge_inds.push(blocks.back.edge_index);
   // FIXME
-  // if (closed && Q.length > 2) {
-  //   const [res, ins] = line_intersection([Q[0], Q[1]], [Q[Q.length - 2], Q[Q.length - 3]])
-  //   if (res) {
-  //     Q[0] = ins;
-  //     Q[Q.length - 1] = ins;
-  //   } else if  (false) { //Q.length) {
-  //     Q.pop();
-  //     const [res, ins] = line_intersection([Q[0], Q[1]], [Q[Q.length - 2], Q[Q.length - 3]])
-  //     if (res) {
-  //       Q[0] = ins;
-  //       Q[Q.length - 1] = ins;
-  //     }
-  //   }
-  // }
+  if (closed && Q.length > 2) {
+    // const [res, ins] = geom.line_intersection([Q[0], Q[1]], [Q[Q.length - 1], Q[Q.length - 2]])
+    // if (res) {
+    //   Q[0] = ins;
+    //   Q[Q.length - 1] = ins;
+    // }
+    Q = Q.slice(0, Q.length-1)
+    edge_inds = edge_inds.slice(0, edge_inds.length-1)
+  }
   if (get_edge_inds)
     return [Q, edge_inds];
   return Q;
