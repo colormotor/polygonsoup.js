@@ -6,9 +6,9 @@ import BinaryTree from 'avl';
 
 const sweepline = function() { }
 
-const fequal = (a, b, eps = 1e-5) => Math.abs(a - b) <= eps;
-const fleq = (a, b, eps = 1e-5) => fequal(a, b) || a < b;
-const fgeq = (a, b, eps = 1e-5) => fequal(a, b) || a > b;
+const fequal = (a, b, eps = 1e-10) => Math.abs(a - b) <= eps;
+const fleq = (a, b) => fequal(a, b) || a < b;
+const fgeq = (a, b) => fequal(a, b) || a > b;
 
 
 const to_point = (p) => [p[0], p[1]]
@@ -17,7 +17,9 @@ const make_isegment = (s) => [[...s[0], 1], [...s[1], 1]]
 const line_intersection = (s0, s1) => {
   let sp0 = cross(s0[0], s0[1]);
   let sp1 = cross(s1[0], s1[1]);
-  let ins = cross(sp0, sp1)
+  let ins = cross(sp0, sp1);
+  if (fequal(ins[2], 0))
+    return [false, [0, 0]];
   return [true, [ins[0] / ins[2], ins[1] / ins[2]]];
 }
 
@@ -159,7 +161,8 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
     step_keys: [],
     sweep_history: [],
     segments: [],
-    intersections: []
+    intersections: [],
+    stuck: false
   }
 
   let brute_number = 0;
@@ -196,22 +199,21 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
     const s1 = segments[i1];
     const s2 = segments[i2];
 
-    const psweep = p_sweep;
-    const sweep_x = psweep[0];
+    const sweep_x = p_sweep[0];
 
     let x1 = 0, x2 = 0;
     if (is_trivial(s1)) {
       x1 = s1[0][0];
     } else if (horizontal(s1)) {
       x1 = s1[0][0];
-      if (x1 < sweep_x) x1 = sweep_x; 
+      //if (x1 < sweep_x) x1 = sweep_x; 
     } else {
-      if (identical(s1[0], psweep))
+      if (identical(s1[0], p_sweep))
         x1 = s1[0][0];
-      else if (identical(s1[1], psweep))
+      else if (identical(s1[1], p_sweep))
         x1 = s1[1][0];
       else {
-        x1 = x_intersection(psweep, s1);
+        x1 = x_intersection(p_sweep, s1);
       }
     }
 
@@ -219,15 +221,14 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
       x2 = s2[0][0];
     } else if (horizontal(s2)) {
       x2 = s2[0][0];
-      if (x2 < sweep_x) x2 = sweep_x;
+      //if (x2 < sweep_x) x2 = sweep_x;
     } else {
-      if (identical(s2[0], psweep))
+      if (identical(s2[0], p_sweep))
         x2 = s2[0][0];
-      else if (identical(s2[1], psweep))
+      else if (identical(s2[1], p_sweep))
         x2 = s2[1][0];
       else {
-        x2 = x_intersection(psweep, s2);
-        
+        x2 = x_intersection(p_sweep, s2);
       }
     }
 
@@ -242,7 +243,7 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
     return res;
   }
 
-  let X = new BinaryTree(point_compare, true);  // event queue
+  let X = new BinaryTree(point_compare, false);  // event queue
   let Y = new BinaryTree(segment_compare); // status
 
   // Add segments to queue
@@ -277,12 +278,9 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
 
   res.segments = segments;
 
-  // second to last segment always contains a query point, used to test points during sweep
+  // last segment always contains a query point, used to test points during sweep
   segments.push([p_sweep, p_sweep]);
-  // last segment always contains sweepline, so it can be accessed in
-  // sweep_less and stored as an index
-  segments.push([p_sweep, p_sweep]);
-
+  
   const step = () => {
     if (X.isEmpty()) return false;
     let it = X.pop();
@@ -376,13 +374,13 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
     let lr = [null, null, []] ;
     
     if (UC.size) {
-      let left = lower_bound(Y, get_sweepline());
+      let left = lower_bound(Y, query_sweepline());
       let leftleft = Y.prev(left);
       if (left && leftleft){
         let found = find_new_event(leftleft.key, left.key, p);
         lr[0] = [leftleft.key, left.key];
       }
-      let rightright = upper_bound(Y, get_sweepline());
+      let rightright = upper_bound(Y, query_sweepline());
       let right = Y.prev(rightright);
       if (right && rightright){
         let found = find_new_event(right.key, rightright.key, p);
@@ -390,9 +388,9 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
       }
     } else {
       // left and right neighbors of p
-      let left = lower_bound(Y, get_sweepline());
+      let left = lower_bound(Y, query_sweepline());
       left = Y.prev(left);
-      let right = upper_bound(Y, get_sweepline());
+      let right = upper_bound(Y, query_sweepline());
       if (left && right)
         {
           lr[0] = [left.key];
@@ -437,26 +435,25 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
           console.log('horizontal L');
         }
       }
-      
     }
   }
 
   const update_sweepline = (p) => {
     p_sweep = p;
-    segments[get_sweepline()] = [p_sweep, p_sweep];
+    //segments[get_sweepline()] = [p_sweep, p_sweep];
     res.sweep_history.push(p);
   }
 
   // update and get index for query point
   const query_point = (p) => {
-    const i = segments.length - 2;
+    const i = segments.length - 1; 
     segments[i] = [p, p];
     return i;
   }
 
   // sweepline index
-  const get_sweepline = () => { segments.length - 1; }
-
+  const query_sweepline = () => { return query_point(p_sweep); } //segments.length - 1; }
+  
   const radially_sorted_segments = (origin, segs) => {
     let theta_segments = [];
     for (var i of segs) {
@@ -477,9 +474,15 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
     return theta_segments;
   }
 
+  let nsteps = 0;
   while (step()) {
+    nsteps++;
+    // if (nsteps > 1300){
+    //   res.stuck = true;
+    //   break;
+    // }
   }
-
+  
   let nverts = 0;
   res.verts = [];
   for (let v in vertices){
@@ -504,55 +507,4 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
   return [intersections, res]
 }
 
-
-// void planar_graph(SweepGraph*                   graph,
-//                   const std::vector<segment_t>& segs,
-//                   bool                          avoid_incident_endpoints) {
-//   Sweepline sweep(segs, avoid_incident_endpoints, graph, false);
-//   sweep.compute();
-// }
-
-// std::vector<Intersection> sweepline_intersections(
-//     const std::vector<segment_t>& segs,
-//     SweepGraph*                   graph,
-//     bool                          avoid_incident_endpoints,
-//     bool                          debug_brute_force) {
-//   Sweepline sweep(segs, avoid_incident_endpoints, graph);
-//   sweep.compute();
-//   if (debug_brute_force) sweep.brute_force_debug();
-//   return sweep.intersections;
-// }
-
-// std::vector<SegmentIntersection> sweepline_segment_intersections(
-//     const std::vector<segment_t>& segs,
-//     bool                          avoid_incident_endpoints,
-//     bool                          debug_brute_force) {
-//   std::vector<Intersection> intersections =
-//       sweepline_intersections(segs,
-//                               0,
-//                               avoid_incident_endpoints,
-//                               debug_brute_force);
-//   std::vector<SegmentIntersection> segment_intersections;
-
-//   std::set<std::pair<int, int>> visited;
-//   for (int i = 0; i < intersections.size(); i++) {
-//     const Intersection& ins = intersections[i];
-//     for (auto it = ins.segments.begin(); it != ins.segments.end(); ++it) {
-//       for (auto jt = std::next(it); jt != ins.segments.end(); ++jt) {
-//         std::pair<int, int> ab = {*it, *jt};
-//         if (visited.find(ab) != visited.end()) continue;
-//         visited.add(ab);
-//         SegmentIntersection sins;
-//         sins.pos    = ins.pos;
-//         sins.seg[0] = ab[0];
-//         sins.seg[1] = ab[1];
-//         segment_intersections.push(sins);
-//       }
-//     }
-//   }
-
-//   return segment_intersections;
-// }
-
-//module.exports = sweepline;
 export default sweepline;
