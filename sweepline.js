@@ -12,19 +12,8 @@ const fequal = (a, b, eps = 1e-4) => {
   return Math.abs(a - b) <= eps;
 }
 
-const _x = (v) => v[0]
-const _y = (v) => v[1]
-const _x1 = (s) => _x(s[0])
-const _x2 = (s) => _x(s[1])
-const _y1 = (s) => _y(s[0])
-const _y2 = (s) => _y(s[1])
-const _dX = (s) => (_x(s[1]) - _x(s[0]))
-const _dY = (s) => (_y(s[1]) - _y(s[0]))
-
-// Modify the first two if the imput type uses for example [0], [1] for coords
 
 const to_point = (p) => [p[0], p[1]]
-
 const make_isegment = (s) => [[...s[0], 1], [...s[1], 1]]
 
 const line_intersection = (s0, s1) => {
@@ -75,16 +64,14 @@ const point_on_segment = (r, s) => {
   return fequal(wedge(v, w), 0) && idot(v, w) >= 0;
 }
 
+const is_trivial = (s) => identical(s[0], s[1]);
 const horizontal = (s) => fequal(s[0][1], s[1][1]);
-
 const identical = (a, b) => fequal(a[0], b[0]) && fequal(a[1], b[1]);
-
 const segments_identical = (a, b) => {
   return (identical(a[0], b[0]) && identical(a[1], b[1])) ||
     (identical(a[0], b[1]) && identical(a[1], b[0]));
 }
 
-const is_trivial = (s) => identical(s[0], s[1]);
 
 // comps
 const compare = (a, b) => {
@@ -95,7 +82,7 @@ const compare = (a, b) => {
   return 1;
 }
 
-const point_less = (a, b) => {
+const point_compare = (a, b) => {
   if (fequal(a[1], b[1])) {
     return compare(a[0], b[0]);
   }
@@ -164,14 +151,14 @@ const sweep_event = function(S, id) {
   this.id = id;
 }
 
-sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoints = true, p5 = null) => {
+sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoints = true, graph = null) => {
   let intersections = [];
 
   let p_sweep = [];
 
   //std::map<int, int>     original;
   let segments = [];
-  let flipped = [];
+
   // let sweep_history = [];
   // let ULCs = []
   // let leftrights = []
@@ -195,22 +182,36 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
 
   //SweepGraph*        graph;
   //std::map<int, int> node_map;
+  let vertices = {};
+  let edges = {};
+  let node_map = {};
 
+  const add_vertex = (v, pos) => {
+    vertices[v] = pos;
+  }
+
+  const add_edge = (a, b) => {
+    var edge_id = a + '_' + b;
+    if(a > b) 
+      edge_id = b + '_' + a;
+    if (!(edge_id in edges)){
+      edges[edge_id] = [a, b];
+    }
+  }
+  
+  let original = {};
+  let flipped = {};
   let theta_segments = [];
 
-  let event_id = 0;
+  var event_id = 0;
 
-  const segment_less = (i1, i2) => {
+  const segment_compare = (i1, i2) => {
     const s1 = segments[i1];
     const s2 = segments[i2];
 
-    // last segment in list holds sweepline
-    //const sweepline =
-    const psweep = p_sweep; //segments[get_sweepline()][0];// p_sweep; //segments[segments.length - 1][0];
-
+    const psweep = p_sweep;
     const sweep_x = psweep[0];
 
-    //console.log('less ' + i1);// p_segments[p_segments.length-1]);
     let x1 = 0, x2 = 0;
     if (is_trivial(s1)) {
       x1 = s1[0][0];
@@ -254,8 +255,8 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
     return res;
   }
 
-  let X = new AVLTree(point_less, true);  // event queue
-  let Y = new AVLTree(segment_less, false); // status
+  let X = new AVLTree(point_compare, true);  // event queue
+  let Y = new AVLTree(segment_compare, false); // status
 
   // Add segments to queue
   let i = 0;
@@ -271,17 +272,23 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
     }
     // input_segments.push_back(segs[i]);
     segments.push(s);
-    //if (graph) graph->flipped[k] = flipped;
-    // original[i] = k;
+    flipped[k] = flip;
+    original[i] = k;
+
     // add segment endpoints to queue
     var ptr = X.find(s[0]);
     if (ptr) {
 
       ptr.data.S.add(i);
     } else {
-      X.insert(s[0], new sweep_event(new Set([i], event_id++)));
+      //console.log('event id ' + event_id);
+      X.insert(s[0], {S:new Set([i]), id:event_id++}); //new sweep_event(new Set([i], event_id++)));
+      
     }
-    X.insert(s[1], new sweep_event(new Set(), event_id++));
+    //console.log('event id ' + event_id);
+    
+    X.insert(s[1], {S:new Set(), id:event_id++}); //new sweep_event(new Set(), event_id++));
+    
     i++;
   }
 
@@ -302,6 +309,7 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
 
   const handle_event_point = (it) => {
     let p = it.key;
+    
     // insert U, C into Y. Ordering with respect to sweep is updated
     update_sweepline(p);
     // segments for current event (top point matches sweepline)
@@ -317,24 +325,20 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
     find_swept_segments(L, C, U, p);
     // // Update graph
     // // Add vertex to graph
-    // int vert = it->second.id;
-    // if (graph) {
-    //   graph->add_vertex(vert, to_point(p));
-
-    //   for (auto i : C) {
-    //     graph->add_edge(node_map[i], vert, original[i]);
-    //     node_map[i] = vert;
-    //   }
-
-    //   for (auto i : L) {
-    //     graph->add_edge(node_map[i], vert, original[i]);
-    //     node_map[i] = vert;
-    //   }
-
-    //   for (auto i : U) node_map[i] = vert;
-    // }
-
-    // update last nodes
+    const vert = it.data.id;
+    // console.log(node_map);
+    add_vertex(vert, to_point(p));
+      for (let i of C) {
+        add_edge(node_map[i], vert);
+        node_map[i] = vert;
+      }
+      for (let i of L) {
+        add_edge(node_map[i], vert);
+        node_map[i] = vert;
+      }
+      for (let i of U)
+        node_map[i] = vert;
+    
 
     // debug info
     res.ULCs.push({ U: U, L: L, C: C });
@@ -376,7 +380,7 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
     // segment endpoints around event point
     const UC = union(U, C);
     let theta_segments = radially_sorted_segments(p, UC);
-    for (var v of theta_segments) {
+    for (let v of theta_segments) {
       Y.insert(v.i);
     }
 
@@ -387,8 +391,9 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
       return;
     }
 
-    let lr = [null, null, []] //range.map(n => n.key)]
+    let lr = [null, null, []] ;
     // Steps 8-16
+
     if (UC.size) {
       let left = lower_bound(Y, get_sweepline());
       let leftleft = Y.prev(left);
@@ -418,45 +423,7 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
     res.leftrights.push(lr);
   }
 
-
-
-  // const equal_range = (Y, key) => {
-  //   let n = Y.find(key);
-  //   if (n == null){
-  //     n = Y._root;
-  //     while(n){
-  //       if
-  //     }
-
-  //     return []
-  //   }
-  //   let range = [n];
-  //   n = Y.prev(range[0]);
-  //   while (n) {
-  //     if (Y._comparator(n.key, key) != 0)
-  //       break;
-  //     range.push(n);
-  //     n = Y.prev(n);
-  //   }
-
-  //   n = Y.next(range[0]);
-  //   while (n) {
-  //     if (Y._comparator(n.key, key) != 0)
-  //       break;
-  //     range.push(n);
-  //     n = Y.next(n);
-  //   }
-
-  //   return range;
-  // }
-
-
   const find_new_event = (sl, sr, p) => {
-    //ipoint ins;
-    //debug_pairs.push_back({segments[sl], segments[sr]});
-    //debug_new_ins = {-100, -100, 1};
-    if (sl == sr)
-      console.log('nope');
     const [res, ins] = segment_intersection(segments[sl], segments[sr])
 
     if (res) {
@@ -464,14 +431,15 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
       if (X.find(ins)) { //} != X.end()) {
         // std::cout << "ipoint already present...\n";
       } else if (ins[1] > p[1] || (fequal(ins[1], p[1]) && ins[0] > p[0])) {
-        X.insert(ins, new sweep_event(new Set(), event_id++));
+        X.insert(ins, {S:new Set(), id:event_id++}); //new sweep_event(new Set(), event_id++));
+        // if (event_id == undefined)
+        //   console.log('new event:' + event_id)
         return true;
       }
     }
 
     return false;
   }
-
 
   const find_swept_segments = (L, C, U, p) => {
     const range = equal_range(Y, query_point(p));
@@ -527,16 +495,20 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
   while (step()) {
   }
 
-  // let test = new AVLTree(point_less);
-  // test.insert([0, 0]);
-  // test.insert([0, 0]);
-  // test.insert([1, 1]);
-  // test.insert([1, 1]);
-  // test.insert([1, 1]);
-  // test.insert([1, 2]);
-  // test.insert([3, 2]);
-  // let range = equal_range(test, [1, 1]);
-  // mth.print(range.map(n => n.key));
+  let nverts = 0;
+  res.verts = [];
+  for (let v in vertices){
+    res.verts.push([]);
+  }
+  for (let v in vertices){
+    res.verts[v] = vertices[v];
+  } 
+  
+  res.edges = [];
+  for (let id in edges){
+    res.edges.push(edges[id]);
+  }
+  
   return [intersections, res]
 }
 
