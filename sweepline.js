@@ -261,66 +261,6 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
     return 1;
   }
 
-  let X = new BinaryTree(point_compare, false);  // event queue
-  let Y = new BinaryTree(segment_compare); // status
-
-  // Add segments to queue
-  let i = 0;
-  let bounds = null;
-  for (var k = 0; k < segs.length; k++) {
-    let s = make_isegment(segs[k]);
-    if (is_trivial(s)) continue;
-    // Reorder segment vertically
-    let flip = false;
-    if (s[0][1] > s[1][1] ||
-      (fequal(s[0][1], s[1][1]) && s[0][0] > s[1][0])) {
-      s = [s[1], s[0]];
-      flip = true;
-    }
-    if (bounds == null){
-      bounds = [[Math.min(s[0][0], s[1][0]), Math.min(s[0][1], s[1][1])],
-                [Math.max(s[0][0], s[1][0]), Math.max(s[0][1], s[1][1])]];
-    }else{
-      bounds[0][0] = Math.min(bounds[0][0], Math.min(s[0][0], s[1][0]));
-      bounds[0][1] = Math.min(bounds[0][1], Math.min(s[0][1], s[1][1]));
-      bounds[1][0] = Math.max(bounds[0][0], Math.max(s[0][0], s[1][0]));
-      bounds[1][1] = Math.max(bounds[0][1], Math.max(s[0][1], s[1][1]));
-    }
-    // input_segments.push_back(segs[i]);
-    segments.push(s);
-    flipped[k] = flip;
-    original[i] = k;
-
-    // add segment endpoints to queue
-    var ptr = X.find(s[0]);
-    if (ptr) {
-      ptr.data.S.add(i); // Event present just add segments
-    } else {
-      X.insert(s[0], {S:new Set([i]), E:new Set(), id:event_id++});
-    }
-
-    ptr = X.find(s[1]);
-    if (ptr) {
-      ptr.data.E.add(i); // Event present just add segments
-    } else {
-      X.insert(s[1], {S:new Set(), E:new Set([i]), id:event_id++});
-    }
-
-    i++;
-  }
-
-  // store re-oriented segments
-  res.segments = segments;
-
-  // add "guard" vertical segments that will never intersect
-  // (this helps with corner cases involving horizontal segments)
-  segments.push([[bounds[0][0]-1000, bounds[0][1]-1000],
-                 [bounds[0][0]-1000, bounds[1][1]+1000]])
-  segments.push([[bounds[1][0]+1000, bounds[0][1]-1000],
-                 [bounds[1][0]+1000, bounds[1][1]+1000]])
-  // last segment always contains a query point, used to test points during sweep
-  segments.push([p_sweep, p_sweep]);
-
   const step = () => {
     if (X.isEmpty()) return false;
     let it = X.pop();
@@ -420,7 +360,7 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
 
     // Debug current segments in status
     if (debug_ind > -1)
-      res.debug.step_keys.push(Y.keys());
+      res.debug.step_keys.push(Y.keys().filter(i=>i<segs.length));
     
     if (Y.isEmpty()) {
       return;
@@ -434,13 +374,15 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
       let leftleft = Y.prev(left);
       if (left && leftleft){
         let found = find_new_event(leftleft.key, left.key, p);
-        lr[0] = [leftleft.key, left.key];
+        if (leftleft.key < segs.length && left.key < segs.length) // check guards
+          lr[0] = [leftleft.key, left.key];
       }
       let rightright = upper_bound(Y, query_sweepline());
       let right = Y.prev(rightright);
       if (right && rightright){
         let found = find_new_event(right.key, rightright.key, p);
-        lr[1] = [right.key, rightright.key];
+        if (right.key < segs.length && rightright.key < segs.length) // check guards
+          lr[1] = [right.key, rightright.key];
       }
       //if (debug_ind == res.leftrights.length)
       //  mth.print(lr);
@@ -451,8 +393,10 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
       let right = upper_bound(Y, query_sweepline());
       if (left && right)
         {
-          lr[0] = [left.key];
-          lr[1] = [right.key];
+          if (left.key < segs.length) // check guards
+            lr[0] = [left.key];
+          if (right.key < segs.length)
+            lr[1] = [right.key];
           let r = find_new_event(left.key, right.key, p);
         }
     }
@@ -537,15 +481,88 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
     return theta_segments;
   }
 
+  const add_segment_to_queue = (s, i) => {
+    // add segment endpoints to queue
+    var ptr = X.find(s[0]);
+    if (ptr) {
+      ptr.data.S.add(i); // Event present just add segments
+    } else {
+      X.insert(s[0], {S:new Set([i]), E:new Set(), id:event_id++});
+    }
+
+    ptr = X.find(s[1]);
+    if (ptr) {
+      ptr.data.E.add(i); // Event present just add segments
+    } else {
+      X.insert(s[1], {S:new Set(), E:new Set([i]), id:event_id++});
+    }
+  }
+
+
+  /* procedure starts here */
+  let X = new BinaryTree(point_compare, false);  // event queue
+  let Y = new BinaryTree(segment_compare); // status
+
+  // Add segments to queue
+  let i = 0;
+  let bounds = null;
+  for (var k = 0; k < segs.length; k++) {
+    let s = make_isegment(segs[k]);
+    if (is_trivial(s)) continue;
+    // Reorder segment vertically
+    let flip = false;
+    if (s[0][1] > s[1][1] ||
+      (fequal(s[0][1], s[1][1]) && s[0][0] > s[1][0])) {
+      s = [s[1], s[0]];
+      flip = true;
+    }
+    // get bounding box
+    if (bounds == null){
+      bounds = [[Math.min(s[0][0], s[1][0]), Math.min(s[0][1], s[1][1])],
+                [Math.max(s[0][0], s[1][0]), Math.max(s[0][1], s[1][1])]];
+    }else{
+      bounds[0][0] = Math.min(bounds[0][0], Math.min(s[0][0], s[1][0]));
+      bounds[0][1] = Math.min(bounds[0][1], Math.min(s[0][1], s[1][1]));
+      bounds[1][0] = Math.max(bounds[1][0], Math.max(s[0][0], s[1][0]));
+      bounds[1][1] = Math.max(bounds[1][1], Math.max(s[0][1], s[1][1]));
+    }
+    // input_segments.push_back(segs[i]);
+    segments.push(s);
+    flipped[k] = flip;
+    original[i] = k;
+
+    add_segment_to_queue(s, i);
+    i++;
+  }
+
+
+  // store re-oriented segments
+  res.segments = segments;
+
+  // add "guard" vertical segments that will never intersect
+  // (this helps with corner cases involving horizontal segments)
+  const offset = 10000
+  segments.push([[bounds[0][0]-offset, bounds[0][1]-offset],
+                 [bounds[0][0]-offset, bounds[1][1]+offset]])
+  add_segment_to_queue(segments[segments.length-1], i++);
+
+  segments.push([[bounds[1][0]+offset, bounds[0][1]-offset],
+                 [bounds[1][0]+offset, bounds[1][1]+offset]])
+  add_segment_to_queue(segments[segments.length-1], i++);
+
+  // last segment always contains a query point, used to test points during sweep
+  segments.push([p_sweep, p_sweep]);
+
+  // iterate through event-queue
   let nsteps = 0;
   while (step()) {
     nsteps++;
     // uncomment to debug when intersection testing gets stuck in an infinite loop
     // guard segments should avoid that
-    // if (nsteps > 3300){
-    //   res.debug.stuck = true;
-    //   break;
-    // }
+    if (nsteps > 3300){
+      res.debug.stuck = true;
+      break;
+    }
   }
 
   // construct output planar graph
