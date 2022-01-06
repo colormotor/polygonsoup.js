@@ -1,3 +1,22 @@
+
+/**
+ *  ______ _______ _____  ___ ___ _______ _______ _______ _______ _______ _______ ______          _____ _______
+ * |   __ \       |     ||   |   |     __|       |    |  |     __|       |   |   |   __ \______ _|     |     __|
+ * |    __/   -   |       \     /|    |  |   -   |       |__     |   -   |   |   |    __/______|       |__     |
+ * |___|  |_______|_______||___| |_______|_______|__|____|_______|_______|_______|___|         |_______|_______|
+ *
+ * © Daniel Berio (@colormotor) 2021 - ...
+ *
+ * Implementation of sweepline segment interesections.
+ * Mainly based on:
+ * Boissonnat and Preparata (1997) Robust Plane Sweep for Intersecting Segments
+ * with some ideas from:
+ * Melhnorn and Naher (1994) Implementation of a Sweep Line Algorithm for the Straight Line Segment Intersection Problem
+ * https://pure.mpg.de/rest/items/item_1834220/component/file_2035159/content
+ * as well as (radial sorting for order) from an implementation here:
+ * https://github.com/h2ssh/Vulcan
+ **/
+
 'use strict';
 const mth = require('./mth.js')
 //import mth from 'mth';
@@ -67,6 +86,7 @@ const point_on_segment = (r, s) => {
 
 const is_trivial = (s) => identical(s[0], s[1]);
 const horizontal = (s) => fequal(s[0][1], s[1][1]);
+const vertical = (s) => fequal(s[0][0], s[1][0]);
 const identical = (a, b) => fequal(a[0], b[0]) && fequal(a[1], b[1]);
 const segments_identical = (a, b) => {
   return (identical(a[0], b[0]) && identical(a[1], b[1])) ||
@@ -93,9 +113,9 @@ const point_compare = (a, b) => {
 const x_intersection = (p_sweep, s) => {
   const dx = s[1][0] - s[0][0];
   const dy = s[1][1] - s[0][1];
-
   if (fequal(dy, 0)) return s[0][0];
   return (dx / dy) * (p_sweep[1] - s[0][1]) + s[0][0];
+  return s
 }
 
 const union = (setA, setB) => {
@@ -150,19 +170,49 @@ const sweep_event = function(S, id) {
   this.id = id;
 }
 
-sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoints = true, graph = null) => {
-  let intersections = [];
+const segment_x = (s, p_sweep) => {
+  let x;
+  if (is_trivial(s)) {
+    x = s[0][0];
+  } else if (horizontal(s)) {
+    x = s[0][0];
+    if (x < p_sweep[0]) x = p_sweep[0];
+  } else if (vertical(s)) {
+    x = s[0][0];
+  } else {
+    if (identical(s[0], p_sweep))
+      x = s[0][0];
+    else if (identical(s[1], p_sweep))
+      x = s[1][0];
+    else {
+      x = x_intersection(p_sweep, s);
+    }
+    s = s[0][0]
+  }
+
+  return x;
+}
+
+sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debug_ind = -1) => {
   let p_sweep = []; // Swept point
   let segments = []; // Input segments with ordered points
 
   let res = {
-    ULCs: [],
-    leftrights: [],
-    step_keys: [],
-    sweep_history: [],
-    segments: [],
-    intersections: [],
-    stuck: false
+    debug : {
+      ULCs: [],
+      leftrights: [],
+      step_keys: [],
+      sweep_history: [],
+      segments: [],
+      intersections: [],
+      stuck: false
+    },
+    segments:[], // reoriented segments
+    intersections:[], // intersections
+    graph: { // planar graph
+      vertices: [],
+      edges: []
+    }
   }
 
   let brute_number = 0;
@@ -171,10 +221,10 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
   let null_pt = [-100, -100, 1];
   let debug_pairs = [];
 
-  // Planar graph 
+  // Planar graph  (internal)
+  let node_map = {};
   let vertices = {};
   let edges = {};
-  let node_map = {};
 
   const add_vertex = (v, pos) => {
     vertices[v] = pos;
@@ -195,52 +245,20 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
 
   var event_id = 0;
 
+  var hflag = true;
+
   const segment_compare = (i1, i2) => {
     const s1 = segments[i1];
     const s2 = segments[i2];
 
-    const sweep_x = p_sweep[0];
+    let x1 = segment_x(s1, p_sweep),
+        x2 = segment_x(s2, p_sweep);
 
-    let x1 = 0, x2 = 0;
-    if (is_trivial(s1)) {
-      x1 = s1[0][0];
-    } else if (horizontal(s1)) {
-      x1 = s1[0][0];
-      //if (x1 < sweep_x) x1 = sweep_x; 
-    } else {
-      if (identical(s1[0], p_sweep))
-        x1 = s1[0][0];
-      else if (identical(s1[1], p_sweep))
-        x1 = s1[1][0];
-      else {
-        x1 = x_intersection(p_sweep, s1);
-      }
-    }
-
-    if (is_trivial(s2)) {
-      x2 = s2[0][0];
-    } else if (horizontal(s2)) {
-      x2 = s2[0][0];
-      //if (x2 < sweep_x) x2 = sweep_x;
-    } else {
-      if (identical(s2[0], p_sweep))
-        x2 = s2[0][0];
-      else if (identical(s2[1], p_sweep))
-        x2 = s2[1][0];
-      else {
-        x2 = x_intersection(p_sweep, s2);
-      }
-    }
-
-    let res = 0;
-
-    if (fequal(x1, x2)) {
-      res = 0;
-    } else if (x1 < x2)
-      res = -1;
-    else
-      res = 1;
-    return res;
+    if (fequal(x1, x2))
+      return 0;
+    else if (x1 < x2)
+      return -1;
+    return 1;
   }
 
   let X = new BinaryTree(point_compare, false);  // event queue
@@ -248,6 +266,7 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
 
   // Add segments to queue
   let i = 0;
+  let bounds = null;
   for (var k = 0; k < segs.length; k++) {
     let s = make_isegment(segs[k]);
     if (is_trivial(s)) continue;
@@ -257,6 +276,15 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
       (fequal(s[0][1], s[1][1]) && s[0][0] > s[1][0])) {
       s = [s[1], s[0]];
       flip = true;
+    }
+    if (bounds == null){
+      bounds = [[Math.min(s[0][0], s[1][0]), Math.min(s[0][1], s[1][1])],
+                [Math.max(s[0][0], s[1][0]), Math.max(s[0][1], s[1][1])]];
+    }else{
+      bounds[0][0] = Math.min(bounds[0][0], Math.min(s[0][0], s[1][0]));
+      bounds[0][1] = Math.min(bounds[0][1], Math.min(s[0][1], s[1][1]));
+      bounds[1][0] = Math.max(bounds[0][0], Math.max(s[0][0], s[1][0]));
+      bounds[1][1] = Math.max(bounds[0][1], Math.max(s[0][1], s[1][1]));
     }
     // input_segments.push_back(segs[i]);
     segments.push(s);
@@ -268,19 +296,31 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
     if (ptr) {
       ptr.data.S.add(i); // Event present just add segments
     } else {
-      X.insert(s[0], {S:new Set([i]), id:event_id++}); //new sweep_event(new Set([i], event_id++)));  
+      X.insert(s[0], {S:new Set([i]), E:new Set(), id:event_id++});
     }
-    
-    X.insert(s[1], {S:new Set(), id:event_id++}); //new sweep_event(new Set(), event_id++));
-    
+
+    ptr = X.find(s[1]);
+    if (ptr) {
+      ptr.data.E.add(i); // Event present just add segments
+    } else {
+      X.insert(s[1], {S:new Set(), E:new Set([i]), id:event_id++});
+    }
+
     i++;
   }
 
+  // store re-oriented segments
   res.segments = segments;
 
+  // add "guard" vertical segments that will never intersect
+  // (this helps with corner cases involving horizontal segments)
+  segments.push([[bounds[0][0]-1000, bounds[0][1]-1000],
+                 [bounds[0][0]-1000, bounds[1][1]+1000]])
+  segments.push([[bounds[1][0]+1000, bounds[0][1]-1000],
+                 [bounds[1][0]+1000, bounds[1][1]+1000]])
   // last segment always contains a query point, used to test points during sweep
   segments.push([p_sweep, p_sweep]);
-  
+
   const step = () => {
     if (X.isEmpty()) return false;
     let it = X.pop();
@@ -296,14 +336,26 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
     // segments for current event (top point matches sweepline)
     let U = new Set();
     for (var i of it.data.S) {
-      let seg = segments[i];
-      if (identical(seg[0], p_sweep))
+      //let seg = segments[i];
+      //if (identical(seg[0], p_sweep))
         U.add(i);
     }
 
+    // Hack... remove segments passed by sweepline
+    const keys = Y.keys();
+    for (let i of keys){
+      const seg = segments[i];
+      const eps = 0.1;
+      if (seg[0][1] < p[1]-eps && seg[1][1] < p[1]-eps)
+        Y.remove(i);
+    }
+
     // bottom-incident (L) and containing (C) segments
-    let L = new Set(), C = new Set();
+    let L = it.data.E;
+    let C = new Set();
+    hflag = true;
     find_swept_segments(L, C, U, p);
+
     // // Update graph
     // // Add vertex to graph
     const vert = it.data.id;
@@ -321,7 +373,8 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
         node_map[i] = vert;
     
     // debug info
-    res.ULCs.push({ U: U, L: L, C: C });
+    if (debug_ind > -1)
+      res.debug.ULCs.push({ U: U, L: L, C: C });
 
     if ((U.size + L.size + C.size) > 1) {
       // found intersection at p
@@ -340,12 +393,13 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
           if (point_in_box(p, segments[i][0], segments[i][1]))
             ins.segments.add(i);
 
-        intersections.push(ins);
+        res.intersections.push(ins);
       }
     }
 
     // debug intersections up to this step
-    res.intersections.push(intersections.slice(0));
+    if (debug_ind > -1)
+      res.debug.intersections.push(res.intersections.slice(0));
 
     // Delete LC from Y
     for (var i of L) {
@@ -365,13 +419,14 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
     }
 
     // Debug current segments in status
-    res.step_keys.push(Y.keys());
+    if (debug_ind > -1)
+      res.debug.step_keys.push(Y.keys());
     
     if (Y.isEmpty()) {
       return;
     }
 
-    let lr = [null, null, []] ;
+    let lr = [null, null, []];
     
     if (UC.size) {
       let left = lower_bound(Y, query_sweepline());
@@ -386,6 +441,8 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
         let found = find_new_event(right.key, rightright.key, p);
         lr[1] = [right.key, rightright.key];
       }
+      //if (debug_ind == res.leftrights.length)
+      //  mth.print(lr);
     } else {
       // left and right neighbors of p
       let left = lower_bound(Y, query_sweepline());
@@ -399,7 +456,8 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
         }
     }
 
-    res.leftrights.push(lr);
+    if (debug_ind > -1)
+      res.debug.leftrights.push(lr);
   }
 
   const find_new_event = (sl, sr, p) => {
@@ -410,7 +468,7 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
       // event
       if (X.find(ins)) { 
       } else if (ins[1] > p[1] || (fequal(ins[1], p[1]) && ins[0] > p[0])) {
-        X.insert(ins, {S:new Set(), id:event_id++}); 
+        X.insert(ins, {S:new Set(), E:new Set(), id:event_id++});
         return true;
       }
     }
@@ -420,6 +478,7 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
 
   const find_swept_segments = (L, C, U, p) => {
     const range = equal_range(Y, query_point(p));
+
     for (var node of range) {
       const seg = segments[node.key];
       if (!U.has(node.key)) {
@@ -429,11 +488,12 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
           C.add(node.key); // Sweepline on segment
         }
       } else {
-        // U has the key but the segment may be horizontal
-        if (horizontal(seg) && identical(seg[1], p_sweep)){
-          L.add(node.key);
-          console.log('horizontal L');
-        }
+        
+        // // U has the key but the segment may be horizontal
+        // if (horizontal(seg) && identical(seg[1], p_sweep)){
+        //   L.add(node.key);
+        //   console.log('horizontal L');
+        // }
       }
     }
   }
@@ -441,7 +501,8 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
   const update_sweepline = (p) => {
     p_sweep = p;
     //segments[get_sweepline()] = [p_sweep, p_sweep];
-    res.sweep_history.push(p);
+    if (debug_ind > -1)
+      res.debug.sweep_history.push(p);
   }
 
   // update and get index for query point
@@ -460,6 +521,8 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
       const seg = segments[i];
       const p = seg[1];
       let theta = Math.atan2(p[1] - origin[1], p[0] - origin[0]) + Math.PI;
+      //if (horizontal(seg))
+      // theta = -1000;
       theta_segments.push({ i: i, theta: theta });
     }
 
@@ -477,34 +540,29 @@ sweepline.sweepline_intersections = (segs, debug_ind = -1, avoid_incident_endpoi
   let nsteps = 0;
   while (step()) {
     nsteps++;
-    // if (nsteps > 1300){
-    //   res.stuck = true;
+    // uncomment to debug when intersection testing gets stuck in an infinite loop
+    // guard segments should avoid that
+    // if (nsteps > 3300){
+    //   res.debug.stuck = true;
     //   break;
     // }
   }
-  
+
+  // construct output planar graph
   let nverts = 0;
-  res.verts = [];
   for (let v in vertices){
-    res.verts.push([]);
+    res.graph.vertices.push([]);
   }
   for (let v in vertices){
-    res.verts[v] = vertices[v];
+    res.graph.vertices[v] = vertices[v];
   } 
   
-  res.edges = [];
   for (let id in edges){
-    res.edges.push(edges[id]);
+    res.graph.edges.push(edges[id]);
   }
-  //
-  // let tree = new BinaryTree();
-  // tree.insert(0);
-  // tree.insert(10);
-  // tree.insert(10);
-  // tree.insert(3);
-  // tree.insert(20);
-  // console.log(equal_range(tree, 10).map(n=>n.key)) //  upper_bound(tree, 10)); 
-  return [intersections, res]
+
+  return res;
 }
+
 
 export default sweepline;
