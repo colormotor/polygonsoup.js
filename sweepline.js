@@ -426,6 +426,7 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
       return;
     }
 
+    // for debug
     let lr = [null, null, []];
     
     if (UC.size) {
@@ -487,20 +488,19 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
         } else {
           C.add(node.key); // Sweepline on segment
         }
-      } else {
-        
+      }
+        //else {
         // // U has the key but the segment may be horizontal
         // if (horizontal(seg) && identical(seg[1], p_sweep)){
         //   L.add(node.key);
         //   console.log('horizontal L');
         // }
-      }
+        // }
     }
   }
 
   const update_sweepline = (p) => {
     p_sweep = p;
-    //segments[get_sweepline()] = [p_sweep, p_sweep];
     if (debug_ind > -1)
       res.debug.sweep_history.push(p);
   }
