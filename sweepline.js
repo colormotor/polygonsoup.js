@@ -306,7 +306,19 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
         node_map[i] = vert;
       }
       for (let i of L) {
-        add_edge(node_map[i], vert);
+        if (vert == undefined){
+          console.log('vert undefined');
+          throw TypeError;
+        }
+        if (node_map[i]!=undefined){
+          add_edge(node_map[i], vert);
+
+        }else{
+          //console.log('node_map undefined for ' + i);
+          //console.log(segs.length);
+          res.debug.stuck = true;
+          //throw TypeError;
+        }
         node_map[i] = vert;
       }
       for (let i of U)
@@ -513,8 +525,8 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
     if (is_trivial(s)) continue;
     // Reorder segment vertically
     let flip = false;
-    if (s[0][1] > s[1][1] ||
-      (fequal(s[0][1], s[1][1]) && s[0][0] > s[1][0])) {
+    if ((!fequal(s[0][1], s[1][1]) && s[0][1] > s[1][1]) ||
+         (fequal(s[0][1], s[1][1]) && s[0][0] > s[1][0])) {
       s = [s[1], s[0]];
       flip = true;
     }
