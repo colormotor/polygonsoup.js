@@ -6,6 +6,7 @@
     "lodash":"4.17.15",
     "p5":"1.4.0",
     "avl":"1.5.3",
+    "splaytree":"3.1.0",
     "seedrandom":"3.0.5",
     "dcel.js":"shawn0326/dcel.js#master"
   },
@@ -16,6 +17,7 @@
     "./p5ut": "./p5ut.js",
     "./lqt": "./lqt.js",
     "./sweepline": "./sweepline.js",
+    "./planar_map": "./planar_map.js",
     "./package.json": "./package.json"
   }
 }
