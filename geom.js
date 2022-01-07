@@ -44,10 +44,34 @@ geom.chord_length = (P, closed = 0) => {
 }
 
 geom.is_compound = (S) => {
-  var d = mth.dim(S);
-  if (d > 3)
+  var d = mth.dim(S).length;
+  if (d > 2)
     return true;
   return false;
+}
+
+geom.edges = (P, closed=false) => {
+  const n = P.length;
+  let m = n;
+  if (!closed)
+    m = m-1;
+  return _.range(0, m).map((i) => [i, (i + 1)%n]);
+}
+
+geom.segments = (S, closed=false) => {
+  if (!geom.is_compound(S))
+    S = [S];
+  let segs = [];
+  for (const P of S){
+    let n = P.length;
+    let m = n;
+    if (!closed)
+      m = m-1;
+    for (let i = 0; i < m; i++){
+      segs.push([P[i], P[(i+1)%n]]);
+    }
+  }
+  return segs;
 }
 
 geom.point_line_distance = (p, a, b) => {
@@ -258,7 +282,24 @@ geom.rect_to_rect_transform = (src, dst) => {
 }
 
 
-// Intersections and all
+/* measures */
+
+geom.polygon_area = (P) => {
+  if (P.length < 3)
+    return 0;
+  let area = 0.0;
+  const n = P.length;
+  let p0, p1;
+  for (let i=0; i < n; i++){
+    p0 = i;
+    p1 = (i+1)%n;
+    area += P[p0][0] * P[p1][1] - P[p1][0] * P[p0][1];
+  }
+  return area * 0.5;
+}
+
+/* Intersections and all */
+
 geom.line_intersection = (s0, s1, eps = 1e-10) => {
   let sp0 = mth.cross([...s0[0], ...[1.0]], [...s0[1], ...[1.0]]);
   let sp1 = mth.cross([...s1[0], ...[1.0]], [...s1[1], ...[1.0]]);
@@ -554,10 +595,10 @@ geom.schematize = (P_, C, angle_offset, closed = false, get_edge_inds = false, m
     // const [res, ins] = geom.line_intersection([Q[0], Q[1]], [Q[Q.length - 1], Q[Q.length - 2]])
     // if (res) {
     //   Q[0] = ins;
-    //   Q[Q.length - 1] = ins;
+    //   // Q[Q.length - 1] = ins;
     // }
-    Q = Q.slice(0, Q.length-1)
-    edge_inds = edge_inds.slice(0, edge_inds.length-1)
+     Q = Q.slice(0, Q.length-1)
+     edge_inds = edge_inds.slice(0, edge_inds.length-1)
   }
   if (get_edge_inds)
     return [Q, edge_inds];
