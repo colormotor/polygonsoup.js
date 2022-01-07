@@ -25,7 +25,7 @@ import BinaryTree from 'avl';
 
 const sweepline = function() { }
 
-const fequal = (a, b, eps = 1e-10) => Math.abs(a - b) <= eps;
+const fequal = (a, b, eps = 1e-5) => Math.abs(a - b) <= eps;
 const fleq = (a, b) => fequal(a, b) || a < b;
 const fgeq = (a, b) => fequal(a, b) || a > b;
 
@@ -54,7 +54,7 @@ const point_in_box = (p, a, b) => {
 
 const segment_intersection = (s0, s1) => {
   const [res, p] = line_intersection(s0, s1);
-  
+
   const no = [false, [0, 0]]
   if (!res) {
     return no;
@@ -232,16 +232,17 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
 
   const add_edge = (a, b) => {
     var edge_id = a + '_' + b;
-    if(a > b) 
+    if(a > b)
       edge_id = b + '_' + a;
     if (!(edge_id in edges)){
       edges[edge_id] = [a, b];
     }
   }
-  
+
   let original = {};
   let flipped = {};
   let theta_segments = [];
+  let guard_ids = [0, 0];
 
   var event_id = 0;
 
@@ -270,7 +271,7 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
 
   const handle_event_point = (it) => {
     let p = it.key;
-    
+
     // insert U, C into Y. Ordering with respect to sweep is updated
     update_sweepline(p);
     // segments for current event (top point matches sweepline)
@@ -296,25 +297,25 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
     hflag = true;
     find_swept_segments(L, C, U, p);
 
-    // // Update graph
-    // // Add vertex to graph
-    const vert = it.data.id;
-    // console.log(node_map);
-    add_vertex(vert, to_point(p));
+    // Update graph
+    let vert = it.data.id;
+    // Only if we are not dealing with a "guard" vertex
+    if (!(vert > guard_ids[0] && vert < guard_ids[1])){
+      add_vertex(vert, to_point(p));
       for (let i of C) {
         add_edge(node_map[i], vert);
         node_map[i] = vert;
       }
       for (let i of L) {
-        if (vert == undefined){
+        if (vert == undefined) {
           console.log('vert undefined');
           throw TypeError;
         }
-        if (node_map[i]!=undefined){
+        if (node_map[i] != undefined) {
           add_edge(node_map[i], vert);
 
-        }else{
-          //console.log('node_map undefined for ' + i);
+        } else {
+          console.log('node_map undefined for ' + i);
           //console.log(segs.length);
           res.debug.stuck = true;
           //throw TypeError;
@@ -323,7 +324,8 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
       }
       for (let i of U)
         node_map[i] = vert;
-    
+    }
+
     // debug info
     if (debug_ind > -1)
       res.debug.ULCs.push({ U: U, L: L, C: C });
@@ -373,14 +375,14 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
     // Debug current segments in status
     if (debug_ind > -1)
       res.debug.step_keys.push(Y.keys().filter(i=>i<segs.length));
-    
+
     if (Y.isEmpty()) {
       return;
     }
 
     // for debug
     let lr = [null, null, []];
-    
+
     if (UC.size) {
       let left = lower_bound(Y, query_sweepline());
       let leftleft = Y.prev(left);
@@ -423,8 +425,11 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
       // sl sr intersect below the sweep line, or on it and to the right of the
       // current event point p, and the intersection is not yet present as an
       // event
-      if (X.find(ins)) { 
-      } else if (ins[1] > p[1] || (fequal(ins[1], p[1]) && ins[0] > p[0])) {
+      if (X.find(ins)) {
+      // again must always use fuzzy equalities or things will go wrong with nearly horizontal segments
+      //} else if (ins[1] > p[1] || (fequal(ins[1], p[1]) && ins[0] > p[0])) {
+      } else if ((!fequal(ins[1], p[1]) && ins[1] > p[1]) ||
+                  (fequal(ins[1], p[1]) && ins[0] > p[0])) {
         X.insert(ins, {S:new Set(), E:new Set(), id:event_id++});
         return true;
       }
@@ -463,14 +468,14 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
 
   // update and get index for query point
   const query_point = (p) => {
-    const i = segments.length - 1; 
+    const i = segments.length - 1;
     segments[i] = [p, p];
     return i;
   }
 
   // sweepline index
   const query_sweepline = () => { return query_point(p_sweep); } //segments.length - 1; }
-  
+
   const radially_sorted_segments = (origin, segs) => {
     let theta_segments = [];
     for (var i of segs) {
@@ -555,6 +560,8 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
 
   // add "guard" vertical segments that will never intersect
   // (this helps with corner cases involving horizontal segments)
+  guard_ids[0] = event_id; // store id so we don't create graph vertices for these
+
   const offset = 10000
   segments.push([[bounds[0][0]-offset, bounds[0][1]-offset, 1],
                  [bounds[0][0]-offset, bounds[1][1]+offset, 1]])
@@ -563,7 +570,7 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
   segments.push([[bounds[1][0]+offset, bounds[0][1]-offset, 1],
                  [bounds[1][0]+offset, bounds[1][1]+offset, 1]])
   add_segment_to_queue(segments[segments.length-1], i++);
-
+  guard_ids[1] = event_id;
   // last segment always contains a query point, used to test points during sweep
   segments.push([p_sweep, p_sweep]);
 
@@ -586,8 +593,8 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
   }
   for (let v in vertices){
     res.graph.vertices[v] = vertices[v];
-  } 
-  
+  }
+
   for (let id in edges){
     res.graph.edges.push(edges[id]);
   }
