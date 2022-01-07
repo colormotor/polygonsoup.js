@@ -207,6 +207,21 @@ const has_nan = (v) => {
 }
 mth.has_nan = has_nan;
 
+const has_undefined = (v) => {
+  if (mth.dim(v).length < 2)
+    for (const x of v)
+      if (x==undefined)
+        return true;
+  return false;
+
+  for (const row of v)
+    if (has_undefined(row))
+      return true;
+
+  return false;
+}
+mth.has_undefined = has_undefined;
+
 mth.print = (v, txt = "") => {
   console.log(txt);
   if (typeof (v) == 'number') {
