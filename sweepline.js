@@ -281,14 +281,14 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
         U.add(i);
     }
 
-    // Hack... remove segments passed by sweepline
-    const keys = Y.keys();
-    for (let i of keys){
-      const seg = segments[i];
-      const eps = 0.1;
-      if (seg[0][1] < p[1]-eps && seg[1][1] < p[1]-eps)
-        Y.remove(i);
-    }
+    // // Hack... remove segments passed by sweepline
+    // const keys = Y.keys();
+    // for (let i of keys){
+    //   const seg = segments[i];
+    //   const eps = 0.1;
+    //   if (seg[0][1] < p[1]-eps && seg[1][1] < p[1]-eps)
+    //     Y.remove(i);
+    // }
 
     // bottom-incident (L) and containing (C) segments
     let L = it.data.E;
@@ -496,6 +496,8 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
     } else {
       X.insert(s[1], {S:new Set(), E:new Set([i]), id:event_id++});
     }
+
+    //X.insert(s[1], {S:new Set(), E:new Set(), id:event_id++});
   }
 
 
@@ -542,12 +544,12 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
   // add "guard" vertical segments that will never intersect
   // (this helps with corner cases involving horizontal segments)
   const offset = 10000
-  segments.push([[bounds[0][0]-offset, bounds[0][1]-offset],
-                 [bounds[0][0]-offset, bounds[1][1]+offset]])
+  segments.push([[bounds[0][0]-offset, bounds[0][1]-offset, 1],
+                 [bounds[0][0]-offset, bounds[1][1]+offset, 1]])
   add_segment_to_queue(segments[segments.length-1], i++);
 
-  segments.push([[bounds[1][0]+offset, bounds[0][1]-offset],
-                 [bounds[1][0]+offset, bounds[1][1]+offset]])
+  segments.push([[bounds[1][0]+offset, bounds[0][1]-offset, 1],
+                 [bounds[1][0]+offset, bounds[1][1]+offset, 1]])
   add_segment_to_queue(segments[segments.length-1], i++);
 
   // last segment always contains a query point, used to test points during sweep
@@ -559,10 +561,10 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
     nsteps++;
     // uncomment to debug when intersection testing gets stuck in an infinite loop
     // guard segments should avoid that
-    if (nsteps > 3300){
-      res.debug.stuck = true;
-      break;
-    }
+    // if (debug_ind > -1 && nsteps > 3000){
+    //   res.debug.stuck = true;
+    //   break;
+    // }
   }
 
   // construct output planar graph
