@@ -29,10 +29,38 @@ mth.norm = mth.norm2;
 
 mth.zero_eps = 1e-15;
 
+/* Von Mises distribution centered at mu and with spread kappa */
+mth.von_mises_like = ( theta, kappa, mu=0.0 ) => {
+  return Math.exp( kappa * Math.cos(theta-mu) );
+}
+
+/* From https://hewgill.com/picomath/javascript/erf.js.html*/
+mth.erf = (x) => {
+    // constants
+    var a1 =  0.254829592;
+    var a2 = -0.284496736;
+    var a3 =  1.421413741;
+    var a4 = -1.453152027;
+    var a5 =  1.061405429;
+    var p  =  0.3275911;
+
+    // Save the sign of x
+    var sign = 1;
+    if (x < 0) {
+        sign = -1;
+    }
+    x = Math.abs(x);
+
+    // A&S formula 7.1.26
+    var t = 1.0/(1.0 + p*x);
+    var y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*Math.exp(-x*x);
+    return sign*y;
+}
+
 mth.randint = (min, max) => Math.floor(mth.rand() * (max - min) ) + min;
 mth.random_choice = (ar) => ar[mth.randint(0, ar.length)]
 
-const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
+mth.clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 
 const ArrayT = Array; // Float64Array;
 // Rare docs for numericjs
@@ -40,7 +68,7 @@ const ArrayT = Array; // Float64Array;
 
 mth.is_number = (v) => typeof(v) == 'number';
 
-mth.matmul = () => {
+mth.matmul = function() {
   var m = arguments[0];
   for (var i = 1; i < arguments.length; i++)
     m = mth.dot(m, arguments[i]);
@@ -365,26 +393,31 @@ mth.rotate_array = function(ar, n) {
   return ar.slice(n, ar.length).concat(ar.slice(0, n));
 }
 
-mth.min = (ar, axis=0) => {
+const min = (ar, axis=-1) => {
   if (mth.dim(ar).length > 1) {
     if (axis==0)
-      return mth.min(mth.transpose(ar), axis=1);
-    else
+      return min(mth.transpose(ar), axis=1);
+    else if (axis==1)
       return ar.map(row=>Math.min.apply(null, row));
+    else
+      return Math.min.apply(null, ar.map(row=>Math.min.apply(null, row)));
   }
   return Math.min.apply(null, ar);
 }
+mth.min = min;
 
-
-mth.max = (ar, axis=0) => {
+const max = (ar, axis=-1) => {
   if (mth.dim(ar).length > 1) {
     if (axis==0)
-      return mth.max(mth.transpose(ar), axis=1);
-    else
+      return max(mth.transpose(ar), axis=1);
+    else if (axis==1)
       return ar.map(row=>Math.max.apply(null, row));
+    else
+      return Math.max.apply(null, ar.map(row=>Math.max.apply(null, row)));
   }
   return Math.max.apply(null, ar);
 }
+mth.max = max;
 
 mth.randspace = (a, b, n, minstep = 0.1, maxstep = 0.5) => {
   var v = mth.uniform(minstep, maxstep, n);
