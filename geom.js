@@ -194,12 +194,12 @@ geom.rect_t = (rect) => rect[0][1];
 geom.rect_b = (rect) => rect[1][1];
 
 geom.rect_corners = (rect, close = false) => {
-  var [w, h] = rect_size(rect);
-  var P = [mth.add(rect[0], 0), mth.add(rect[0], [w, 0]),
-  mth.add(rect[1], 0), mth.add(rect[0] + [0, h])];
-  if (close)
-    P.append(P[0]);
-  return P
+  let [w, h] = geom.rect_size(rect);
+  let P = [mth.add(rect[0], [0,0]), mth.add(rect[0], [w, 0]),
+           mth.add(rect[0], [w,h]), mth.add(rect[0], [0, h])];
+  //if (close)
+  //  P.push(P[0]);
+  return P;
 }
 
 geom.random_point_in_rect = (rect) => {
@@ -222,7 +222,8 @@ geom.scale_rect = (rect, s, halign = 0, valign = 0) => {
     origin[1] = geom.rect_t(rect);
   if (valign == 1)
     origin[1] = geom.rect_b(rect);
-  var A = mth.matmul(geon.trans_2d(origin), geom.scaling_2d([sx, sy]), mth.neg(geom.trans_2d(origin)));
+
+  var A = mth.matmul(geom.trans_2d(origin), geom.scaling_2d([sx, sy]), geom.trans_2d(mth.neg(origin)));
   return [geom.affine_transform(A, r[0]), geom.affine_transform(A, r[1])];
 }
 
@@ -256,7 +257,7 @@ geom.rect_in_rect = (src, dst, padding = 0., axis = -1) => {
 }
 
 /// Return homogeneous transformation matrix that fits src rect into dst
-geom.rect_in_rect_transform = (src, dst, padding = 0., axis = None) => {
+geom.rect_in_rect_transform = (src, dst, padding = 0., axis = -1, scale=[1,1]) => {
   var fitted = geom.rect_in_rect(src, dst, padding, axis);
   var cenp_src = geom.rect_center(src);
   var cenp_dst = geom.rect_center(fitted);
@@ -265,7 +266,8 @@ geom.rect_in_rect_transform = (src, dst, padding = 0., axis = None) => {
   M = mth.dot(M,
     geom.trans_2d(mth.sub(cenp_dst, cenp_src)));
   M = mth.dot(M, geom.trans_2d(cenp_src));
-  M = mth.dot(M, geom.scaling_2d(mth.div(rect_size(fitted), rect_size(src))));
+  M = mth.dot(M, geom.scaling_2d(scale));
+  M = mth.dot(M, geom.scaling_2d(mth.div(geom.rect_size(fitted), geom.rect_size(src))));
   M = mth.dot(M, geom.trans_2d(mth.neg(cenp_src)));
   return M;
 }
@@ -502,15 +504,22 @@ geom.schematize = (P_, C, angle_offset, closed = false, get_edge_inds = false, m
     return b0
   }
 
-  if (C < 1)
+  if (C < 1){
     if (get_edge_inds)
-      return P_, _.range(0, P_.length);
+      return [P_, _.range(0, P_.length)];
     else
       return P_;
+  }
 
   let P = [...P_];
-  if (closed)
-    P.push(P[0]);
+  if (closed){
+    const a = P[P.length-1];
+    const b = P[0];
+    for (const t of mth.linspace(0, 1, 5).slice(1, 5))
+      P.push(mth.lerp(a, b, t));
+
+    //P.push(P[0]);
+  }
   let edges = _.range(0, P.length - 1).map((i) => [i, i + 1]);
 
   // Orthognonal directions
@@ -549,8 +558,8 @@ geom.schematize = (P_, C, angle_offset, closed = false, get_edge_inds = false, m
           }
         }
       }
-      b0 = b1
-      b1 = b1.next
+      b0 = b1;
+      b1 = b1.next;
     }
 
     if (!num_merges)
@@ -592,13 +601,14 @@ geom.schematize = (P_, C, angle_offset, closed = false, get_edge_inds = false, m
   edge_inds.push(blocks.back.edge_index);
   // FIXME
   if (closed && Q.length > 2) {
+    // Q = geom.cleanup_contour(Q, true, 0.01);
     // const [res, ins] = geom.line_intersection([Q[0], Q[1]], [Q[Q.length - 1], Q[Q.length - 2]])
-    // if (res) {
+    // if (res && mth.distance(ins, Q[0])<100) {
     //   Q[0] = ins;
-    //   // Q[Q.length - 1] = ins;
+    //   Q[Q.length - 1] = ins;
     // }
-     Q = Q.slice(0, Q.length-1)
-     edge_inds = edge_inds.slice(0, edge_inds.length-1)
+     //Q = Q.slice(0, Q.length-1)
+     //edge_inds = edge_inds.slice(0, edge_inds.length-1)
   }
   if (get_edge_inds)
     return [Q, edge_inds];
