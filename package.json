@@ -17,6 +17,7 @@
     "./p5ut": "./p5ut.js",
     "./lqt": "./lqt.js",
     "./sweepline": "./sweepline.js",
+    "./brush": "./brush.js",
     "./planar_map": "./planar_map.js",
     "./package.json": "./package.json"
   }
