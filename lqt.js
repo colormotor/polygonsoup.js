@@ -216,6 +216,7 @@ lqt.solve_batch = (sys, ref, d, opt_x0 = false, r = -1) => {
 
       var Rq = mth.block([[Uu, Ux0],
       [X0u, X0x0]]);
+      // console.log(mth.dim(invf(Rq)));//.print(Rq);
 
       var rq = mth.vstack([Uxbar, X0bar]);
       var ux0 = mth.dot(invf(Rq), rq); // #mth.linalg.solve(Rq, rq)
@@ -287,26 +288,26 @@ lqt.solve_batch = (sys, ref, d, opt_x0 = false, r = -1) => {
 
 /// Resample a possibly sparse trajectory
 lqt.resample = (res, subd = 1, observe = false, get_commands = false, discretization = 'exact') => {
-  var x = res.x, u = res.u, sys = res.sys;
-  var x0 = res.x[0];
-  var n = mth.dim(x)[0];
-  var dim = mth.dim(u)[1];
-  var cDim = mth.dim(x)[1];
+  let x = res.x, u = res.u, sys = res.sys;
+  let x0 = res.x[0];
+  let n = mth.dim(x)[0];
+  let dim = mth.dim(u)[1];
+  let cDim = mth.dim(x)[1];
 
-  var dt = sys.dt;
-  var dts = dt / (subd);
+  let dt = sys.dt;
+  let dts = dt / (subd);
 
-  var ns = lqt.num_samples(subd, n);
-  var xs = mth.zeros(cDim, ns);
-  var us = mth.zeros(dim, ns - 1);
+  let ns = lqt.num_samples(subd, n);
+  let xs = mth.zeros(ns, cDim)
+  let us = mth.zeros(ns-1, dim);
 
-  var [Ad, Bd] = sys.discretize(dts, discretization);
+  let [Ad, Bd] = sys.discretize(dts, discretization);
 
-  var t = 0;
+  let t = 0;
   xs[0] = x[0];
-  for (var i = 0; i < n - 1; i++) {
+  for (let i = 0; i < n - 1; i++) {
     //xs[t] = x[i];
-    for (var j = 0; j < subd; j++) {
+    for (let j = 0; j < subd; j++) {
       xs[t + 1] = mth.add(mth.dot(Ad, xs[t]), mth.dot(Bd, u[i])); // u[:,i]
       us[t] = u[i];
       t += 1;
@@ -392,11 +393,12 @@ lqt.reference_activations = (P, m, n, activation_sigma, alpha = 0., get_activati
 
 /// Reference trajectory in cartesian coordinates
 lqt.cartesian_reference = (sys, P, Sigma, activation_sigma = 0.5,
-  periodic = false,
-  stop_movement = true,
-  alpha = 0.0,
-  clamp = false,
-  diag = 0) => {
+                           periodic = false,
+                           stop_movement = true,
+                           initial_state = null,
+                           alpha = 0.0,
+                           clamp = false,
+                           diag = 0) => {
   if (periodic) {
     P = mth.vstack([P, [P[0]]]);
     Sigma = [...Sigma, ...[Sigma[0]]];
@@ -440,6 +442,9 @@ lqt.cartesian_reference = (sys, P, Sigma, activation_sigma = 0.5,
     Q[timesteps[i]] = Lambda[states[i]];
   }
 
+  if (initial_state != null)
+    MuQ[0] = initial_state;
+
   MuQ = mth.transpose([mth.concatenate(MuQ)]);
   Q = mth.block_diag(Q);
 
@@ -470,7 +475,7 @@ lqt.cartesian_reference = (sys, P, Sigma, activation_sigma = 0.5,
 /// Create LQT trajectory with tied covariances
 lqt.tied_lqt = function(
   P,
-  params = {}) {
+  params = {}, initial_state=null) {
   if (params.angle == undefined) params.angle = 30;
   if (params.isotropy == undefined) params.isotropy = 0.5;
   if (params.sigma == undefined) params.sigma = 3;
@@ -484,15 +489,16 @@ lqt.tied_lqt = function(
   if (params.subd == undefined) params.subd = 5;
   if (params.subsample == undefined) params.subsample = 4;
   if (params.dim == undefined) params.dim = 2;
+  if (params.smoothing == undefined) {params.smoothing = mth.ones(P.length);}
   var Sigma = [];
   var cov = mth.mul(mth.eye(params.dim), params.sigma ** 2);
   mth.set_submat(cov, [0, 2], [0, 2], lqt.make_cov_2d(mth.radians(params.angle), [params.isotropy * params.sigma, params.sigma]));
-  for (const p of P)
-    Sigma.push(cov);
+  for (let i = 0; i < P.length; i++)
+    Sigma.push(mth.mul(cov, params.smoothing[i]*params.smoothing[i]));
 
   var sys = new lqt.LinearSystem(params.order, params.subd, params.dim, params.segment_duration);
 
-  var ref = lqt.cartesian_reference(sys, P, Sigma, params.activation_sigma, params.periodic, params.stop_movement);
+  var ref = lqt.cartesian_reference(sys, P, Sigma, params.activation_sigma, params.periodic, params.stop_movement, initial_state);
   var res = lqt.solve_batch(sys, ref, params.d, params.opt_x0);
 
   if (params.subsample > 0)
@@ -500,6 +506,58 @@ lqt.tied_lqt = function(
   else
     var x = res.x;
   return x;
+}
+
+/// Use to concatenate multiple (semi-tied) trajectories with smooth ligatures
+lqt.tied_concatenator = () => {
+  let endstate = null;
+
+  /// next_point=null means this is the last chunk to be added
+  return (Q, next_point, params={}) => {
+    let pars = _.clone(params);
+    if (pars.ligature_smooth == undefined) pars.ligature_smooth = 1;
+    if (endstate != null)
+      Q = [endstate.slice(0,2)].concat(Q);
+
+    // If this is the last concatenated motor plan,
+    let clip = false;
+    if (next_point != null){
+      clip = true;
+      Q = Q.concat([next_point]);
+    }
+    // ligature smoothing
+    let smoothing = mth.ones(Q.length);
+    if (endstate != null){
+      smoothing[0] = params.ligature_smooth;
+    }
+    if (clip){
+      smoothing[smoothing.length-2] = pars.ligature_smooth;
+      smoothing[smoothing.length-1] = pars.ligature_smooth;
+    }
+    pars.smoothing = smoothing;
+
+    // never optimize initial state for a concatenated trajectory
+    if (endstate != null){
+      pars.opt_x0 = false;
+    }
+
+    // compute trajectory
+    let x = lqt.tied_lqt(Q, pars, endstate);
+    // if not last glyph remove extra ligature points
+    if (next_point != null){
+      const chunk_size = parseInt(x.length/(Q.length-1));
+      x = x.slice(0, x.length-chunk_size);
+    }
+
+    endstate = x[x.length-1];
+    return x;
+  };
+}
+
+lqt.trajectory_speed = (x) => {
+  let dx = mth.transpose(x).slice(2,4);
+  dx = mth.mul(dx, dx);
+  return mth.sqrt(mth.add(dx[0], dx[1]));
 }
 
 lqt.evolute = (X, get_radii = true) => {
@@ -520,6 +578,7 @@ lqt.evolute = (X, get_radii = true) => {
 
   return [mth.transpose([x, y]), r];
 }
+
 
 lqt.test = () => {
   var A = [[0, 1], [1, 0]];
