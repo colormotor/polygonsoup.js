@@ -8,7 +8,9 @@
     "avl":"1.5.3",
     "splaytree":"3.1.0",
     "seedrandom":"3.0.5",
-    "dcel.js":"shawn0326/dcel.js#master"
+    "multivariate-normal":"0.1.2",
+    "dcel.js":"shawn0326/dcel.js#master",
+    "heapify":"0.6.0"
   },
   "exports": {
     "./geom": "./geom.js",
@@ -19,6 +21,7 @@
     "./sweepline": "./sweepline.js",
     "./brush": "./brush.js",
     "./planar_map": "./planar_map.js",
+    "./color": "./color.js",
     "./package.json": "./package.json"
   }
 }
