@@ -10,7 +10,57 @@
  **/
 
 'use strict';
+const {MinQueue} = require("heapify");
+
 const alg = function() { }
+
+/**
+ * A^* path finding.
+ * @param {any} G graph (assumed to be graphology graph https://github.com/graphology/graphology)
+ * @param {any} start
+ * @param {any} goal
+ * @param {any} dist
+ * @param {any} heuristic
+ * @returns
+ */
+alg.astar = (G, start, goal, dist=(n)=>1, heuristic=(n)=>0) => {
+  let openSet = new MinQueue(G.order*3);
+  openSet.push(start, 0);
+
+  let cameFrom = {};
+
+  let gScore = {};
+  gScore[start] = 0;
+  let fScore = {};
+  fScore[start] = heuristic(start);
+
+  const reconstruct_path = (current) => {
+    let total_path = [current];
+    while (current in cameFrom){
+      current = cameFrom[current];
+      total_path.push(current);
+    }
+    return total_path.reverse();
+  };
+
+  while (openSet.size) {
+    let current = openSet.pop();
+    if (current == goal)
+      return reconstruct_path(current);
+
+    for (const bor of G.neighbors(current)){
+      const s = gScore[current] + dist(current, bor);
+      if (! (bor in gScore) || s < gScore[bor]){
+        cameFrom[bor] = current;
+        gScore[bor] = s;
+        fScore[bor] = s + heuristic(bor);
+        openSet.push(bor, fScore[bor]);
+      }
+    }
+  }
+  return null;
+}
+
 
 alg.DoublyLinkedList = function() {
   this.front = null;
