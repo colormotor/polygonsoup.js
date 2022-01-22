@@ -14,7 +14,8 @@
 'use strict';
 var mth = require("numericjs");
 const _ = require("lodash");
-var seedrandom = require('seedrandom');
+const seedrandom = require('seedrandom');
+const mvn = require("multivariate-normal").default;
 
 var rng = seedrandom();
 
@@ -56,6 +57,30 @@ mth.erf = (x) => {
     var y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*Math.exp(-x*x);
     return sign*y;
 }
+
+mth.gaussian = (mean, stddev) => {
+    return function() {
+        var V1
+        var V2
+        var S
+        do{
+          var U1 = mth.rand();
+            var U2 = mth.rand()
+            V1 = 2*U1-1
+            V2 = 2*U2-1
+            S = V1*V1+V2*V2
+        }while(S >= 1)
+        if(S===0) return 0
+        return mean+stddev*(V1*Math.sqrt(-2*Math.log(S)/S))
+    }
+}
+
+mth.multivariate_gaussian = (mean, cov) => {
+  console.log(mvn);
+  let distribution = mvn(mean, cov);
+  return distribution.sample;
+}
+
 
 mth.randint = (min, max) => Math.floor(mth.rand() * (max - min) ) + min;
 mth.random_choice = (ar) => ar[mth.randint(0, ar.length)]
@@ -360,7 +385,7 @@ mth.radians = (x) => Math.PI / 180 * x;
 
 mth.degrees = (x) => x * (180.0 / Math.PI);
 
-mth.normalize = (v) => v / mth.norm(v);
+mth.normalize = (v) => mth.div(v, mth.norm(v));
 
 mth.angle_between = (a, b) => {
   return Math.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1]);
