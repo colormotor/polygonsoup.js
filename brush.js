@@ -13,7 +13,7 @@ const scurve2 = (t) => {
 }
 
 const hat = (x, sharpness) => {
-    return (Math.tanh((1.-Math.abs(x*2))*sharpness)*0.5+0.5);
+    return (mth.erf((1.-Math.abs(x*2))*sharpness)*0.5+0.5);
 }
 
 brush.brush_image = (w, h, theta, power, smoothness, hole=2, hole_amt=0) => {
@@ -68,8 +68,9 @@ brush.brush_image_p5 = (p5, color, alpha,
     for (let i = 0; i < img.width; i++)
         for (let j = 0; j < img.height; j++){
             v = data[j][i]*alpha; //Math.pow(data[j][i], 2.2)*255;//*alpha;
+            //v = (v > 128) ? 255: 0;
             //v = Math.pow(data[j][i], 1.0/2.2)*255;//*alpha;
-            p =  data[j][i];
+            p = data[j][i];
             img.set(i, j, p5.color(...srgb(color, p), v)); //color[0]*p, color[1]*p, color[2]*p, v));
         }
     img.updatePixels();
