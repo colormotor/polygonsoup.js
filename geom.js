@@ -83,7 +83,7 @@ geom.point_line_distance = (p, a, b) => {
 geom.point_segment_distance = (p, a, b) => {
   const d = mth.sub(b, a);
   const u = mth.clamp(mth.dot(mth.sub(p, a), d) / mth.dot(d, d), 0, 1);
-  const proj = mth.add(a, mth.mul(u, d));
+  const proj = mth.add(a, mth.mul(d, u));
   return mth.distance(proj, p);
 }
 
@@ -94,17 +94,14 @@ geom.project_on_line = (p, a, b) => {
 }
 
 geom.rot_2d = (theta, affine = true) => {
-  if (affine)
-    var d = 3;
-  else
-    var d = 2;
+  let d = affine?3:2;
 
-  m = mth.eye(d)
-  ct = Math.cos(theta)
-  st = Math.sin(theta)
-  m[0][0] = ct; m[0][1] = -st
-  m[1][0] = st; m[1][1] = ct
-  return m
+  let m = mth.eye(d);
+  let ct = Math.cos(theta);
+  let st = Math.sin(theta);
+  m[0][0] = ct; m[0][1] = -st;
+  m[1][0] = st; m[1][1] = ct;
+  return m;
 }
 
 geom.trans_2d = (xy) => {
@@ -312,7 +309,7 @@ geom.line_intersection = (s0, s1, eps = 1e-10) => {
 }
 
 
-geom.line_intersection_uv = (a1, a2, b1, b2, aIsSegment = False, bIsSegment = False) => {
+geom.line_intersection_uv = (a1, a2, b1, b2, aIsSegment = false, bIsSegment = false) => {
   const EPS = 0.00001;
   var intersection = mth.zeros(2);
   var uv = mth.zeros(2)
@@ -386,9 +383,9 @@ geom.shapes.random_radial_polygon = (n, min_r, max_r, center = [0, 0]) => {
   return res;
 }
 
-geom.shapes.star = (cenp, r, n=5, ratio_inner=1) => {
+geom.shapes.star = (cenp, r, n=5, ratio_inner=1, start_theta=0) => {
   const R  = [r / (1.618033988749895 + 1) * ratio_inner, r];
-  const theta = mth.add(mth.linspace(0, Math.PI * 2, n * 2 + 1), Math.PI / (n * 2)).slice(0, n*2);
+  const theta = mth.add(mth.linspace(start_theta, Math.PI * 2 + start_theta, n * 2 + 1), Math.PI / (n * 2)).slice(0, n*2);
   var P = [];
   for (var i = 0; i < theta.length; i++)
     P.push([Math.cos(theta[i]) * R[i % 2] + cenp[0], Math.sin(theta[i]) * R[i % 2] + cenp[1]]);
@@ -613,6 +610,149 @@ geom.schematize = (P_, C, angle_offset, closed = false, get_edge_inds = false, m
   if (get_edge_inds)
     return [Q, edge_inds];
   return Q;
+}
+
+//Edge = namedtuple('Edge', 'a b m i')
+
+const compare_nums = (a, b) => {
+  return a - b;
+}
+
+geom.hatch = (S, dist, angle=0.0, flip_horizontal=false, max_count=10000, eps=1e-10) => {
+  if (!S.length)
+    return [];
+  if (!geom.is_compound(S))
+    S = [S];
+
+
+  // Rotate shape for oriented hatches
+  const theta = mth.radians(angle);
+  let mat = geom.rot_2d(-theta);
+  S = geom.affine_transform(mat, S);
+
+  const box = geom.bounding_box(S);
+
+  // build edge table
+  let ET = [];
+  for (let i = 0; i < S.length; i++){
+    const P = S[i];
+    const n = P.length;
+    if (n <= 2)
+      continue;
+
+    let dx, dy, m;
+    for (let j = 0; j < n; j++){
+      let [a, b] = [P[j], P[(j+1)%n]];
+      // reorder increasing y
+      if (a[1] > b[1])
+        [a, b] = [b, a];
+      // slope
+      dx = (b[0] - a[0]);
+      dy = (b[1] - a[1]);
+      if (Math.abs(dx) > eps)
+        m = dy/dx;
+      else
+        m = 1e15;
+      if (Math.abs(m) < eps)
+        m = null;
+      ET.push({a:a, b:b, m:m, i:i});
+    }
+  }
+  // sort by increasing y of first point
+  ET.sort((ea, eb)=>compare_nums(ea.a[1], eb.a[1]));
+
+  // intersection x
+  const ex = (e, y) => {
+    if (e.m == null)
+      return null;
+    return (e.a[0] + (y - e.a[1])/e.m);
+  };
+
+
+  let y = box[0][1];
+  let scanlines = [];
+  let AET = []; // active edge table
+  let flip = 0;
+  let c = 0;
+  //console.log(ET.length);
+  while (ET.length || AET.length){
+    if (y > box[1][1])
+      break;
+    if (c >= max_count){
+      console.log("scanlines: reached max number of iterations: " + c);
+      break;
+    }
+    c += 1;
+
+    //console.log(ET.length);
+    // move from ET to AET
+    let i = 0;
+    //console.log(ET[0].a[1])
+    //console.log(y);
+    for (const e of ET){
+      if (e.a[1] <= y){
+        AET.push(e);
+        i += 1;
+      }else{
+        break;
+      }
+    }
+
+    if (i < ET.length)
+      ET = ET.slice(i);
+    else
+      ET = [];
+
+    // remove passed edges
+    AET.sort((ea, eb)=>compare_nums(ea.b[1], eb.b[1])); //  = sorted(AET, key=lambda e: e.b[1])
+    AET = AET.filter(e=>e.b[1] > y);
+    let xs = AET.map(e=>[ex(e, y), e.i]);
+    xs = xs.filter(xi=>xi[0] != null);
+
+    // sort xs (flipped each scanline for more efficent plotting )
+    if (flip)
+      xs.sort((va, vb)=>compare_nums(-va[0], -vb[0])); // = sorted(xs, key=lambda v: -v[0])
+    else
+      xs.sort((va, vb)=>compare_nums(va[0], vb[0]));
+
+    if (flip_horizontal)
+      flip = !flip;
+
+    if (xs.length > 1){
+      let parity = 1; // assume even-odd fill rule
+      let x1,i1,x2,i2;
+      for (let k = 0; k < xs.length-1; k++){
+        [x1, i1] = xs[k];
+        [x2, i2] = xs[k+1];
+        let pa = [x1, y];
+        let pb = [x2, y];
+
+        if (parity){
+
+          scanlines = scanlines.concat([pa,pb]);
+
+        }
+
+        parity = !parity;
+      }
+    }
+
+    // increment
+    y += dist;
+  }
+
+  // unrotate
+  if (scanlines.length){
+    scanlines = geom.affine_transform(mth.transpose(mat), scanlines);
+    //mth.print([scanlines[2], scanlines[3]]);
+
+    scanlines = _.range(0, scanlines.length, 2).map(i=>[scanlines[i], scanlines[i+1]]);
+  }
+
+
+  //    # make list of hatch segments
+  //    scanlines = [[a, b] for a, b in zip(scanlines[0::2], scanlines[1::2])]
+  return scanlines;
 }
 
 geom.foo = () => 0;
