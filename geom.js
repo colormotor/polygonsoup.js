@@ -19,7 +19,6 @@ const _ = require("lodash");
 
 const geom = function() { };
 
-
 /// Chord lengths for each segment of a contour
 geom.chord_lengths = (P, closed = 0) => {
   if (closed)
@@ -612,12 +611,20 @@ geom.schematize = (P_, C, angle_offset, closed = false, get_edge_inds = false, m
   return Q;
 }
 
-//Edge = namedtuple('Edge', 'a b m i')
-
 const compare_nums = (a, b) => {
   return a - b;
 }
 
+/**
+ * Computes hatch (scan)lines for a polygon or a compound shape according to the even-odd fill rule
+ * @param {Array} polygon or shape
+ * @param {Number} dist distance between scanlines
+ * @param {Number} angle scanline orientation
+ * @param {bool} flip_horizontal if true, flip odd scanline orientation
+ * @param {any} max_count maximum number of scanlines
+ * @param {any} eps tolerance for zero distance
+ * @returns an array of coordinate pairs one pair for each scanline
+ */
 geom.hatch = (S, dist, angle=0.0, flip_horizontal=false, max_count=10000, eps=1e-10) => {
   if (!S.length)
     return [];
@@ -674,7 +681,6 @@ geom.hatch = (S, dist, angle=0.0, flip_horizontal=false, max_count=10000, eps=1e
   let AET = []; // active edge table
   let flip = 0;
   let c = 0;
-  //console.log(ET.length);
   while (ET.length || AET.length){
     if (y > box[1][1])
       break;
@@ -684,11 +690,8 @@ geom.hatch = (S, dist, angle=0.0, flip_horizontal=false, max_count=10000, eps=1e
     }
     c += 1;
 
-    //console.log(ET.length);
     // move from ET to AET
     let i = 0;
-    //console.log(ET[0].a[1])
-    //console.log(y);
     for (const e of ET){
       if (e.a[1] <= y){
         AET.push(e);
@@ -728,9 +731,7 @@ geom.hatch = (S, dist, angle=0.0, flip_horizontal=false, max_count=10000, eps=1e
         let pb = [x2, y];
 
         if (parity){
-
           scanlines = scanlines.concat([pa,pb]);
-
         }
 
         parity = !parity;
@@ -744,14 +745,9 @@ geom.hatch = (S, dist, angle=0.0, flip_horizontal=false, max_count=10000, eps=1e
   // unrotate
   if (scanlines.length){
     scanlines = geom.affine_transform(mth.transpose(mat), scanlines);
-    //mth.print([scanlines[2], scanlines[3]]);
-
     scanlines = _.range(0, scanlines.length, 2).map(i=>[scanlines[i], scanlines[i+1]]);
   }
 
-
-  //    # make list of hatch segments
-  //    scanlines = [[a, b] for a, b in zip(scanlines[0::2], scanlines[1::2])]
   return scanlines;
 }
 
