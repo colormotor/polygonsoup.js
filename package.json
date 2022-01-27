@@ -19,6 +19,7 @@
     "./p5ut": "./p5ut.js",
     "./lqt": "./lqt.js",
     "./sweepline": "./sweepline.js",
+    "./skeletal_strokes":"./skeletal_strokes.js",
     "./brush": "./brush.js",
     "./planar_map": "./planar_map.js",
     "./color": "./color.js",
