@@ -14,6 +14,21 @@ const {MinQueue} = require("heapify");
 
 const alg = function() { }
 
+const permutations = (a) => {
+  if (a.length < 2)
+    return [a];
+  let c, d, b = [];
+  for (c = 0; c < a.length; c++) {
+    var e = a.splice(c, 1),
+    f = permutations(a);
+    for (d = 0; d < f.length; d++)
+      b.push([e].concat(f[d]));
+    a.splice(c, 0, e[0]);
+  }
+  return b;
+}
+alg.permutations = permutations;
+
 /**
  * A^* path finding.
  * @param {any} G graph (assumed to be graphology graph https://github.com/graphology/graphology)
@@ -80,36 +95,47 @@ alg.DoublyLinkedList = function() {
     elem.next = null;
     if (this.back == null) {
       this.back = this.front = elem;
-      return
+      return;
     }
     if (at == null) {
-      at = this.back;
+      elem.prev = this.back;
+      this.back.next = elem;
       this.back = elem;
-      elem.next = null;
     } else {
+      elem.prev = at;
       elem.next = at.next;
+      at.next   = elem;
+
+      if (elem.next == null) {
+        this.back = elem;
+      } else {
+        elem.next.prev = elem;
+      }
     }
-    elem.prev = at;
-    at.next = elem;
   }
 
   this.insert = (elem, at = null) => {
     elem.prev = null;
     elem.next = null;
-    if (this.back == null) {
+
+    if (this.front == null) {
       this.back = this.front = elem;
-      return
+      return;
     }
     if (at == null) {
-      at = this.front;
-      this.back = elem;
-      elem.prev = null;
+      elem.next = this.front;
+      this.front.prev = elem;
+      this.front = elem;
     } else {
+      elem.next = at;
       elem.prev = at.prev;
+      at.prev = elem;
+      if (elem.prev == null) {
+        this.front = elem;
+      } else {
+        elem.prev.next = elem;
+      }
     }
-
-    elem.next = at;
-    at.prev = elem;
   }
 
   this.nodes = function*() {
