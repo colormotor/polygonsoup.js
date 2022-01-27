@@ -456,6 +456,22 @@ mth.lerp = (a, b, t) => {
   return mth.add(a, mth.mul(mth.sub(b, a), t));
 }
 
+mth.madd = (a, b, c) => {
+  return mth.add(mth.mul(a, b), c);
+}
+
+mth.addm = (a, b, c) => {
+  return mth.add(a, mth.mul(b, c));
+}
+
+mth.msub = (a, b, c) => {
+  return mth.sub(mth.mul(a, b), c);
+}
+
+mth.subm = (a, b, c) => {
+  return mth.sub(a, mth.mul(b, c));
+}
+
 mth.quantize = (v, step) => Math.round(v / step) * step;
 
 mth.dist2sq = (a, b) => (b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]);
