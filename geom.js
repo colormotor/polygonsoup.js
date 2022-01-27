@@ -42,6 +42,48 @@ geom.chord_length = (P, closed = 0) => {
   return mth.sum(L);
 }
 
+geom.normals_2d = (P, closed=false, vertex=false) => {
+  if (closed)
+    P = P.concat([P[0]]);
+
+  const D = mth.diff(P, 0);
+  let T, N;
+  if (vertex && D.length > 1) {
+    T = mth.add(mth.slice(D, -1), D.slice(1));
+    if (!closed)
+      T = mth.vstack([T[0]], T, [T[T.length-1]]);
+    N = mth.transpose(mth.dot([[0,1],[-1, 0]], mth.transpose(T)));
+  }else{
+    T = D;
+    N = mth.transpose(mth.dot([[0,1],[-1, 0]], mth.transpose(T)));
+    if (!closed)
+      N = mth.vstack([N], [N[N.length-1]]);
+    else
+      N = mth.slice(N, -1);
+  }
+  return N.map(n=>mth.normalize(n));
+}
+
+geom.turning_angles = (P, closed, N, all_points) => {
+  if (P.length <= 2) return mth.zeros(P.length);
+  if (!N.length)
+    N = geom.normals_2d(P, closed);
+  if (closed) {
+    N = [N[N.length-1]].concat(N);
+  }
+
+  const n = N.length;
+  let A = mth.zeros(n - 1);
+
+  for (let i = 0; i < n - 1; i++)
+    A[i] = mth.angle_between(N[i], N[i + 1]);
+
+  if (all_points && !closed)
+    A = mth.concatenate([[0], A, [0]]);
+
+  return A;
+}
+
 geom.is_compound = (S) => {
   var d = mth.dim(S).length;
   if (d > 2)
