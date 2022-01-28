@@ -53,12 +53,31 @@ const compare_nums = (a, b) => {
  * @param {any} duplicate_joints
  * @returns
  */
-skeletal_strokes.split_polyline_horizontal = (p5, P,
-  closed,
-  xs,
-  duplicate_joints) => {
+skeletal_strokes.split_polyline_horizontal = (P,
+                                              closed,
+                                              xs,
+                                              flip_normals,
+                                              duplicate_joints, p5=null) =>
+{
+  let nsign = 1;
   let edges = geom.edges(P, closed);
-  let N = geom.normals_2d(P, closed, false);
+
+  let N = [];
+  if (flip_normals) nsign = -1;
+  for (let i = 0; i < edges.length; i++) {
+    let e = edges[i];
+    let  a = P[e[0]];
+    let  b = P[e[1]];
+    if (mth.distance(a, b) < zero_eps) {
+      if (i < edges.length - 1)
+        b = P[edges[i + 1][1]];
+      else
+        a = P[edges[i - 1][1]];
+    }
+    N.push(mth.mul(mth.perp(mth.normalize(mth.sub(b, a))), nsign));
+  }
+
+  //let N = geom.normals_2d(P, closed, false);
 
   let ET = [];
   let a, b;
@@ -280,15 +299,22 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
   if (params.duplicate_joints==undefined) params.duplicate_joints = true;
   let debug = false;
   let p5 = null;
-  if (params.debug!=undefined)
+  if (params.debug!=undefined){
+    debug=true;
     p5 = params.debug;
+  }
+  let compound = true;
+  if (!geom.is_compound(prototype)){
+    prototype = [prototype];
+    compound = false;
+  }
   if (rect==null)
     rect = geom.bounding_box(prototype);
 
   const proto_box = geom.bounding_box(prototype);
 
-  const aspect_l = fabs(geom.rect_l(rect) - geom.rect_l(proto_box)) / geom.rect_h(rect);
-  const aspect_r = fabs(geom.rect_r(proto_box) - geom.rect_r(rect)) / geom.rect_h(rect);
+  const aspect_l = Math.abs(geom.rect_l(rect) - geom.rect_l(proto_box)) / geom.rect_h(rect);
+  const aspect_r = Math.abs(geom.rect_r(proto_box) - geom.rect_r(rect)) / geom.rect_h(rect);
 
   // normalize control path and widths
   const    ch_lengths      = geom.cum_chord_lengths(spine);
@@ -299,7 +325,8 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
 
   let P = spine;
   let W = width_profile;
-  if (mth.dim(width_profile).length < 1)
+
+  if (mth.dim(width_profile).length < 2)
     W = _.range(0, W.length-1).map(i=>[W[i], W[i+1]]);
   W = mth.mul(W, geom.rect_h(rect));
 
@@ -310,6 +337,8 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
   let N = D.map(d=>mth.neg(mth.perp(mth.normalize(d))));
 
   let Alpha = geom.turning_angles(P, closed, true);  // P.closed, true);
+  //
+  //console.log([D.length, W.length, Alpha.length])
   if (mth.has_nan(Alpha))
     console.log( "NaN turning angle" );
 
@@ -325,6 +354,7 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
   let frame_count = m;
   if (!closed)
     frame_count -= 1;
+
   for (let i = 0; i < frame_count; i++) {
     let p = P[(i + 1) % m];
 
@@ -339,18 +369,18 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
     if (Math.abs(alpha) < 1e-5) {
       alpha = 1e-5;
     }
-
     let o1 = w2 / Math.sin(alpha);  // eq 2
     let o2 = w1 / Math.sin(alpha);
 
-    if (Math.has_nan(o1) || Math.has_nan(o2))
+    if (isNaN(o1) || isNaN(o2)){
       console.log("sin(alpha)==0");
-
-    let u1 = mth.mul(d1, o1 * sign(alpha));  // eq 1
-    let u2 = mth.mul(d2, -o2 * sign(alpha));
+    }
+    let u1 = mth.mul(d1, o1 * Math.sign(alpha));  // eq 1
+    let u2 = mth.mul(d2, -o2 * Math.sign(alpha));
 
     frames.push([u1, u2]);
   }
+
 
   // compute left and right profiles
   let L = [];
@@ -386,7 +416,7 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
     // double fold_ang_amt = 2.*std::min(Math.abs(alpha), 1.) / ag::pi; //alpha /
     // (ag::pi/2); //std::min(Math.abs(alpha) / (ag::pi/2), 1.)*sign(alpha);
     let sigma        = params.fold_angle_sigma;
-    let fold_ang_amt = 1. - Maht.exp(-(alpha * alpha) / (sigma * sigma));
+    let fold_ang_amt = 1. - Math.exp(-(alpha * alpha) / (sigma * sigma));
     // std::cout << "fold_amt: " << sigma << std::endl;
     let unfold = params.unfold;
 
@@ -401,7 +431,7 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
     {
       // use normals instead of local frame in that case
       // and use blended width
-      let n  = mth.mul(mth.normalize(mth.add(N[ip1], N[i])), sign(alpha));
+      let n  = mth.mul(mth.normalize(mth.add(N[ip1], N[i])), Math.sign(alpha));
       unfold = true;
       let b      = mth.mul(n, Math.max(W[i][0], W[ip1, 0]));
 
@@ -412,7 +442,7 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
         // the normal will result in a self intersecting prototype poligon
         // so we consider the perpendicular to the bisector here
         // std::cout << "opposing sign" << std::endl;
-        n   = mth.mul(mth.perp(mth.normalize(mth.add(u1o1, u2o2))), sign(alpha));
+        n   = mth.mul(mth.perp(mth.normalize(mth.add(u1o1, u2o2))), Math.sign(alpha));
         b   = mth.mul(n, Math.max(W[i][0], W[ip1][0]));
         ss1 = -1;
         ss2 = 1;
@@ -428,7 +458,7 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
 // #endif
 
 //     // Mitering
-    let limit = Math.max(W(1, i), W(0, ip1)) * params.miter_limit;
+    let limit = Math.max(W[i][1], W[ip1][0]) * params.miter_limit;
     let    d1    = D[i];
     let    d2    = D[ip1];
     let    hu1   = mth.normalize(u1o1);
@@ -446,6 +476,7 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
     }
 
     let bb = apply_miter(b, p, d1, d2, limit);
+
     if (mth.has_nan(bb))
       console.log("SkeletalStroke: Mitering prudced NaN");
     convex_side.push(mth.addm(p, bb[0], ss1));
@@ -457,7 +488,7 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
     } else {
       concave_side.push(mth.add(mth.subm(p, b, ss1),
                                  mth.mul(hu1, min_fold_length * ss1 * fold_ang_amt)));
-      concave_side.add(mth.add(mth.subm(p, b, ss2),
+      concave_side.push(mth.add(mth.subm(p, b, ss2),
                                 mth.mul(hu2, min_fold_length * ss2 * fold_ang_amt)));  //*fold_ang_amt*sign(alpha)*ss2);
     }
   }
@@ -474,8 +505,8 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
   }
 
   if (!closed) {
-    L.add(mth.addm(P[P.lenght-1], N[N.length - 1], W[W.length - 1][1]));
-    L.add(mth.subm(P[P.lenght-1], N[N.length - 1], W[W.length - 1][1]));
+    L.push(mth.addm(P[P.length-1], N[N.length - 1], W[W.length - 1][1]));
+    R.push(mth.subm(P[P.length-1], N[N.length - 1], W[W.length - 1][1]));
   } else {
     concave_side[0] = concave_side[concave_side.length-1];
     convex_side[0]  = convex_side[convex_side.length-1];
@@ -486,7 +517,7 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
   // Build prototype polygons
   let envelopes = [];
 
-  for (let i = 0; i < L.size(); i += 2) {
+  for (let i = 0; i < L.length; i += 2) {
     let proto =  [L[i], L[i + 1], R[i + 1], R[i]];
     if (debug){
       p5.noFill();
@@ -514,9 +545,211 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
 
     let x0      = mth.addm( tl, right, t0 );
     let x1      = mth.addm( tl, right, t1 );
-    let quad    = [x0, x1, mth.add(x1, up), mth.ad(x0, up)];
+    let quad    = [x0, x1, mth.add(x1, up), mth.add(x0, up)];
     prototype_rects.push(quad);
   }
+
+  const norm_rec = NormalizeRec(rect);
+
+  // compute subdivision points
+  let flip_normals = false;
+  let alternate_normals = false;
+  let flesh = [];
+  for (const F_ of prototype) {
+    let F = norm_rec.normalize_poly(F_); //normalize_polyline(F_, rect);
+    //console.log(xsub);
+    let vlist = skeletal_strokes.split_polyline_horizontal(F,
+                                                           true, //TODO fixme
+                                          xsub,
+                                          flip_normals,
+                                          params.duplicate_joints);
+    if (alternate_normals) flip_normals = !flip_normals;
+
+    let num_verts = 0;
+    let vi        = 0;
+    for (let v of vlist) {
+      let pind = Math.min(v.partition_index, P.length - 1);
+      // Project position according to prototype
+      //mth.print(undefined);
+      let pos = norm_rec.unnormalize(v.pos);
+
+      let aspect   = norm_rec.w / l;
+      let    proj_pos = transform_with_envelope(
+          pind,
+          pos,
+          prototype_rects,
+          envelopes,
+          l,
+          aspect_l,
+          aspect_r);
+      v.edge_normal = mth.normalize(mth.sub(transform_with_envelope(pind,
+                                                            mth.add(pos, v.edge_normal),
+                                                            prototype_rects,
+                                                            envelopes,
+                                                            aspect,
+                                                            aspect_l,
+                                                            aspect_r),
+                                            proj_pos));
+      if (mth.has_nan(proj_pos))
+        console.log("proj_pos Nan");
+      v.pos = proj_pos;
+
+      if (vi == 0)  // || vi==vlist.size()-1)
+        v.spine_index = 0;
+
+      if (vi == vlist.length - 1) {
+        if (closed) {
+          v.spine_index = 0;
+        } else {
+          v.spine_index = spine.length - 1;
+        }
+      }
+
+      // check for joint type (concave or convex)
+      let is_joint = v.type == "JOINT";
+      if (closed) {
+        is_joint = is_joint || (vi == 0 || vi == vlist.length - 1);
+      }
+
+      if (is_joint) {
+        let th = Alpha[v.spine_index];
+        let d  = mth.add(mth.normalize(mth.neg(D[mth.imod(v.spine_index - 1, m)])),
+                         mth.normalize(D[mth.imod(v.spine_index, m)]));
+
+
+        if (mth.dot(d, v.edge_normal) > 0) {
+          v.concave = true;
+        } else {
+        }
+      } else {
+        // set spine index according to projection over segment realtive postion
+        let    pa = spine[pind];
+        let    pb = spine[(pind + 1) % m];
+        let d = mth.sub(pa, pb);
+        let dot = mth.dot(mth.sub(v.pos, pa), d);
+
+        let denom = mth.dot(d, d);
+        let t  = geom.project(v.pos, pa, pb);
+        if (t < 0.5)
+          v.spine_index = pind;
+        else
+          v.spine_index = (pind + 1) % (m + 1);
+
+        if (vi == 0) v.spine_index = 0;
+        if (vi == vlist.length - 1) v.spine_index = spine.length - 1;
+      }
+      num_verts++;
+      vi++;
+    }  // end vertex loop
+
+    //mth.print(undefined);
+    flesh.push(vlist.map(v=>v.pos));
+  }
+
+  if (!compound)
+    flesh = flesh[0];
+  return flesh;
 }
+
+const apply_miter = (b, p, d1, d2, limit) => {
+  let l = mth.norm(b);
+
+  if (l <= limit)
+    return [b, b];
+
+  let bu = mth.div(b, l);
+  let bp = mth.mul(mth.perp(bu), 10);
+
+  let p1a = mth.add(p, b);
+  let p1b = mth.sub(p1a, d1);
+
+  let p2a = mth.add(p, b);
+  let p2b = mth.add(p2a, d2);
+
+  let bp1 = mth.zeros(2);
+  let bp2 = mth.zeros(2);
+  let res;
+  [res, bp1] = geom.line_segment_intersection(
+    mth.addm(p, bu, limit),
+    mth.add(mth.addm(p, bu, limit), bp),
+                            p1a,
+                            p1b);
+  [res, bp2] = geom.line_segment_intersection(
+    mth.addm(p, bu, limit),
+    mth.add(mth.addm(p, bu, limit), bp),
+                            p2a,
+                            p2b);
+
+  const bb = [mth.sub(bp1, p), mth.sub(bp2, p)];
+  mth.has_nan(bb);
+  return bb;
+}
+
+const envelope_origin = (env) => {
+  return mth.div(mth.add(env[0], env[3]), 2);
+};
+
+const envelope_side = (env) => {
+  return mth.sub(mth.div(mth.add(env[1], env[2]), 2),
+                 mth.div(mth.add(env[0], env[3]), 2));
+};
+
+const envelope_up = (env, t) => {
+  let u1 = mth.sub(env[3], env[0]);
+  let u2 = mth.sub(env[2], env[1]);
+  return mth.addm(u1, mth.sub(u2, u1), t);
+};
+
+const envelope_size = (env, t) => {
+  let side = envelope_side(env);
+  let up   = envelope_up(env, t);
+  return [mth.norm(side), mth.norm(up)];
+}
+
+const transform_with_envelope = (pind,
+                                 p,
+                                 prototype_rects,
+                                 envelopes,
+                                 l,
+                                 aspect_l,
+                                 aspect_r) => {
+  let src = prototype_rects[pind];
+  let dst = envelopes[pind];
+                                   let q = p;
+  p = mth.div(mth.sub(p, envelope_origin(src)), envelope_size(src, 0.));
+  let t             = p[0];
+  let tclip         = mth.clamp(t, 0.0, 1.0);
+
+  let w = mth.norm(envelope_side(dst));
+  let h = mth.norm(envelope_up(dst, tclip));
+  let a = (h / l);
+  if (t < 0.0) {
+    t *= a * aspect_l;
+  } else if (t > 1.0) {
+    t = 1. + (t - 1) * a * aspect_r;
+  }
+
+    //                               console.log('cazz');
+  //mth.print(undefined);
+  return mth.add(mth.addm(envelope_origin(dst), envelope_side(dst), t),
+                                                  mth.mul(envelope_up(dst, tclip), p[1]));
+}
+// Generates shape normalization info for skeletal strokes
+const NormalizeRec = (rect) => {
+  let    bmin = rect[0];
+  let    bmax = rect[1];
+  let y    = mth.addm(bmax[1], bmin[1], 0.5);
+  let x0    = [bmin[0], y];
+  let w     = bmax[0] - bmin[0];
+
+  return {x0:x0, w:w,
+          normalize: (p) => mth.div(mth.sub(p, x0), w),
+          unnormalize: (p) => mth.madd(p, w, x0),
+          normalize_poly: (P) => P.map(p=>mth.div(mth.sub(p, x0), w)),
+          unnormalize_poly: (P) => P.map(p=>mth.madd(p, w, x0))
+         };
+};
+
+
 
 module.exports = skeletal_strokes;
