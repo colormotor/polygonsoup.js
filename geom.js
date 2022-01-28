@@ -64,7 +64,7 @@ geom.normals_2d = (P, closed=false, vertex=false) => {
   return N.map(n=>mth.normalize(n));
 }
 
-geom.turning_angles = (P, closed, N, all_points) => {
+geom.turning_angles = (P, closed, all_points=false, N=[]) => {
   if (P.length <= 2) return mth.zeros(P.length);
   if (!N.length)
     N = geom.normals_2d(P, closed);
@@ -129,9 +129,14 @@ geom.point_segment_distance = (p, a, b) => {
 }
 
 geom.project_on_line = (p, a, b) => {
-  let d = mth.sub(b, a)
+  let d = mth.sub(b, a);
   let t = mth.dot(mth.sub(p, a), d) / mth.dot(d, d);
   return mth.add(a, mth.mul(mth.sub(b, a), t));
+}
+
+geom.project = (p, a, b) => {
+  const d = mth.sub(b, a);
+  return mth.dot(mth.sub(p, a), d) / mth.dot(d, d);
 }
 
 geom.rot_2d = (theta, affine = true) => {
