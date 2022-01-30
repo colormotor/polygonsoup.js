@@ -2,10 +2,32 @@
 const DCEL = require('dcel.js')
 const mth = require('./mth.js')
 const geom = require('./geom.js')
-
-import sweepline from "./sweepline.js";
+const sweepline = require('./sweepline.js');
+//import sweepline from "./sweepline.js";
 const planar_map = function() { }
 
+planar_map.edge_key = sweepline.edge_key;
+
+planar_map.compute = (segs, debug_ind = -1, avoid_incident=false) => {
+  let res = sweepline.sweepline_intersections(segs, avoid_incident, debug_ind);
+
+  let dcel = new DCEL.DCEL(res.graph.vertices, res.graph.edges);
+  let dfaces = dcel.internalFaces();
+
+  let map = {
+    faces: [],
+    vertices: res.graph.vertices,
+    edges: res.graph.edges,
+    edge_segments: res.graph.edge_segments
+  };
+
+  for (let face of dfaces)
+  {
+    map.faces.push(face.vertexlist.map(v => v.id));
+  }
+
+  return map;
+}
 
 planar_map.compute_faces = (segs, get_intersections = false, debug_ind = -1, avoid_incident=true) => {
   let res = sweepline.sweepline_intersections(segs, avoid_incident, debug_ind);
@@ -14,9 +36,12 @@ planar_map.compute_faces = (segs, get_intersections = false, debug_ind = -1, avo
 
   let dcel = new DCEL.DCEL(res.graph.vertices, res.graph.edges);
   let dfaces = dcel.internalFaces();
+  let ind = 0;
   for (let face of dfaces)
-      faces.push(face.vertexlist.map(v => [v.x, v.y]))
-
+  {
+    faces.push(face.vertexlist.map(v => res.graph.vertices[v.id]));//[v.x, v.y]))
+    ind = face.vertexlist[0].id;
+  }
   if (get_intersections)
     return [faces, res];
   return faces;
@@ -59,5 +84,5 @@ planar_map.compute_shape_faces = (S, closed=false, get_intersections = false, de
 
 
 
-//module.exports = planar_map
-export default planar_map;
+module.exports = planar_map
+// export default planar_map;

@@ -17,7 +17,8 @@
  **/
 
 'use strict';
-import BinaryTree from 'avl';
+//import BinaryTree from 'avl';
+const BinaryTree = require('avl').default;
 
 const sweepline = function() { }
 
@@ -181,6 +182,12 @@ const equal_range = (Y, key) => {
 }
 
 
+sweepline.edge_key = (a, b) => {
+    if(a > b)
+      return b + '_' + a;
+    else
+      return a + '_' + b;
+  }
 
 /**
  * Computes intersections between a list of segments each defined as [[x1,y1],[x2,y2]], using a variant of the Bentley Ottman method
@@ -211,7 +218,8 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
     intersections:[], // intersections
     graph: { // planar graph
       vertices: [],
-      edges: []
+      edges: [],
+      edge_segments: []
     }
   }
 
@@ -225,17 +233,17 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
   let node_map = {};
   let vertices = {};
   let edges = {};
+  let edge_to_segment = {};
 
   const add_vertex = (v, pos) => {
     vertices[v] = pos;
   }
 
-  const add_edge = (a, b) => {
-    var edge_id = a + '_' + b;
-    if(a > b)
-      edge_id = b + '_' + a;
+  const add_edge = (a, b, seg) => {
+    var edge_id = sweepline.edge_key(a, b);
     if (!(edge_id in edges)){
       edges[edge_id] = [a, b];
+      edge_to_segment[edge_id] = seg;
     }
   }
 
@@ -286,10 +294,13 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
     // Update graph
     let vert = it.data.id;
     // Only if we are not dealing with a "guard" vertex
-    if (!(vert > guard_ids[0] && vert < guard_ids[1])){
+    if (!(vert >= guard_ids[0] && vert < guard_ids[1])){
+      if (!p.length){
+        console.log("problem");
+      }
       add_vertex(vert, to_point(p));
       for (let i of C) {
-        add_edge(node_map[i], vert);
+        add_edge(node_map[i], vert, original[i]);
         node_map[i] = vert;
       }
       for (let i of L) {
@@ -298,7 +309,7 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
           throw TypeError;
         }
         if (node_map[i] != undefined) {
-          add_edge(node_map[i], vert);
+          add_edge(node_map[i], vert, original[i]);
 
         } else {
           console.log('node_map undefined for ' + i);
@@ -570,19 +581,31 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
 
   // construct output planar graph
   let nverts = 0;
+  let vertex_index = {};
+  let count = 0;
   for (let v in vertices){
-    res.graph.vertices.push([]);
-  }
-  for (let v in vertices){
-    res.graph.vertices[v] = vertices[v];
+    res.graph.vertices.push(vertices[v]);
+    vertex_index[v] = count++;
   }
 
+  // for (let v in vertices){
+  //   res.graph.vertices[v] = vertices[v];
+  // }
+  // console.log(res.graph.vertices.length);
+  // for (const v of res.graph.vertices)
+  //   if (!v.length)
+  //     console.log(v.length);
+
   for (let id in edges){
-    res.graph.edges.push(edges[id]);
+    let [a,b] = edges[id];
+
+    res.graph.edges.push([vertex_index[a], vertex_index[b]]); //edges[id]);
+    res.graph.edge_segments.push(edge_to_segment[id]);
   }
 
   return res;
 }
 
 
-export default sweepline;
+module.exports = sweepline;
+//export default sweepline;
