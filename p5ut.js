@@ -15,14 +15,21 @@ var p5 = require("p5");
 var mth = require("./mth.js");
 
 p5.prototype.polygon2 = function(P, closed=false){
-  this.beginShape();
+  if (this.drawingContext instanceof WebGLRenderingContext)
+    this.beginShape(this.TESS);
+  else
+    this.beginShape();
   for (const p of P)
     this.vertex(p[0], p[1]);
   if (closed)
     this.endShape(this.CLOSE);
   else
     this.endShape();
-}
+};
+
+p5.prototype.setLineDash = function(list) {
+  this.drawingContext.setLineDash(list);
+};
 
 p5.prototype.plot = function(rect, y){
   this.beginShape();
