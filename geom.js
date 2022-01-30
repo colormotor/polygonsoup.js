@@ -19,6 +19,8 @@ const _ = require("lodash");
 
 const geom = function() { };
 
+geom.angle_between = mth.angle_between;
+
 /// Chord lengths for each segment of a contour
 geom.chord_lengths = (P, closed = 0) => {
   if (closed)
@@ -416,6 +418,142 @@ geom.ray_intersection = (a1, a2, b1, b2) => {
 geom.ray_segment_intersection = (a1, a2, b1, b2) => {
   var [res, intersection, uv] = geom.line_intersection_uv(a1, a2, b1, b2, false, true);
   return [res && uv[0] > 0 && uv[1] > 0, intersection];
+}
+
+geom.is_point_in_triangle = (p, tri, eps=1e-10) => {
+  const L = _.range(0,3).map(i=>geom.left_of(p, tri[i], tri[(i+1)%3], eps));
+  return L[0]==L[1] && L[1]==L[2];
+}
+
+geom.triangle_area = ( a, b, c ) => {
+  let da = mth.sub(a, b);
+  let db = mth.sub(c, b);
+  return mth.det([da, db])*0.5;
+}
+
+// # Assumes coordinate system with y up so actually will be "right of" if visualizd y down
+geom.left_of = (p, a, b, eps=1e-10) =>{
+  return geom.triangle_area(a, b, p) < eps;
+}
+
+geom.is_point_in_polygon = (p, P) => {
+  let c = false;
+  let n = P.length;
+  let j = n-1;
+  for (let i = 0; i < n; i++){
+    if ( ((P[i][1]>p[1]) != (P[j][1]>p[1])) &&
+         (p[0] < (P[j][0] - P[i][0])*(p[1] - P[i][1]) / (P[j][1] - P[i][1]) + P[i][0]) ) {
+      c = !c;
+    }
+    j = i;
+  }
+  return c;
+}
+
+/// Even odd point in shape
+geom.is_point_in_shape = (p, S) => {
+  let c = 0;
+  let flags = [];
+  for (const P of S)
+    if (geom.is_point_in_polygon(p, P))
+      c = c+1;
+
+    return (c%2) == 1;
+  }
+
+geom.polygon_area = (P) => {
+  if (P.length < 3)
+    return 0;
+  const n = P.length;
+  let area = 0.0;
+  for (let i = 0; i < n; i++){
+    let p0 = i;
+    let p1 = (i+1)%n;
+    area += P[p0][0] * P[p1][1] - P[p1][0] * P[p0][1];
+  }
+  return area * 0.5;
+}
+
+/// Select convex vertex (with arbitrary winding)
+geom.select_convex_vertex = (P, area=null) => {
+  if (area==null)
+    area = geom.polygon_area(P);
+  let n = P.length;
+  let maxh = 0;
+  let verts = [];
+  for (let v=0; v < n; v++){
+    let [a, b] = [mth.imod(v-1,n), (v+1)%n];
+    let ang = geom.angle_between(mth.sub(P[v],P[a]), mth.sub(P[b],P[v]));
+    if (ang*area > 0){
+      const h = geom.point_line_distance(P[v], P[a], P[b]);
+      if (h > maxh){
+        maxh = h;
+        verts.push(v);
+      }
+    }
+  }
+  return verts[verts.length-1];
+}
+
+/// Get a point inside polygon P
+/// if P is a tuple (S, i), P=S[i] and test considers multiple shape contours
+/// See http://apodeline.free.fr/FAQ/CGAFAQ/CGAFAQ-3.html and O'Rourke
+geom.get_point_in_polygon = (P, area=null) => {
+  let input = undefined;
+  if (P.shape != undefined){
+    // With a {shape:s, ind:ind} object assume we are indexing a shape
+    input = P;
+    P = input.shape[input.ind];
+  }
+
+  const n = P.length;
+  if (area==null)
+    area = geom.polygon_area(P);
+  let v = geom.select_convex_vertex(P, area);
+  let [a, b] = [mth.imod(v-1, n), (v+1)%n];
+  let inside = [];
+  let dist = Infinity;
+  let d;
+  // Check if no other point is inside the triangle a, v, b
+  //  and select closest to v if any present
+  for (let i = 0; i < n-3; i++){
+    let q = (b+1+i)%n;
+    if (geom.is_point_in_triangle(P[q], [P[a], P[v], P[b]])){
+      d = mth.distance(P[q], P[v]);
+      if (d < dist){
+        dist = d;
+        inside.push(P[q]);
+      }
+    }
+  }
+
+  if (input!=undefined) { // With a compound shape we need to also test the other vertices
+    for (let si = 0; si < input.shape.length; si++){
+      const Q = input.shape[si];
+      if (si==input.ind)
+        continue;
+      let m = len(Q);
+      for (let i=0; i < m; i++){
+        if (geom.is_point_in_triangle(Q[i], [P[a], P[v], P[b]])){
+          d = distance(P[q], P[v]);
+          if (d < dist){
+            dist = d;
+            inside.push(Q[i]);
+          }
+        }
+      }
+    }
+  }
+  let res;
+
+  if (!inside.length){
+    res = mth.mean([P[a], P[v], P[b]], 0);
+  }else{
+    // no points inside triangle, select midpoint
+    res = mth.mean([inside[inside.length-1], P[v]]);
+  }
+
+  return res;
 }
 
 

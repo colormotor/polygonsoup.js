@@ -246,6 +246,7 @@ mth.reshape = (x, shape) => {
 }
 
 const has_nan = (v) => {
+
   if (mth.dim(v).length < 2){
     for (const x of v)
       if (isNaN(x))
