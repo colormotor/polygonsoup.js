@@ -23,11 +23,13 @@ const Edge = (i, a, b, m, flipped) => {
 const FleshVertex = (pos,
                      type="NORMAL",
                      partition_index = -1,
+                     partition_indices = [],
                      spine_index = -1,
                      flipped = false) => {
                        return {pos: pos,
                                type: type,
                                partition_index: partition_index,
+                               partition_indices: partition_indices,
                                spine_index: spine_index,
                                flipped: flipped,
                                convave: false,
@@ -186,6 +188,7 @@ skeletal_strokes.split_polyline_horizontal = (P,
         flesh_data[e.a].pos[0] = x;
         if (flesh_data[e.a].partition_index == -1) {
           flesh_data[e.a].partition_index = CLAMP_PARTITION(i);
+          flesh_data[e.a].partition_indices = [CLAMP_PARTITION(i)];
           flesh_data[e.a].flipped = e.flipped;
         }
         has_intersection = false;
@@ -195,6 +198,7 @@ skeletal_strokes.split_polyline_horizontal = (P,
         flesh_data[e.b].pos[0] = x;
         if (flesh_data[e.a].partition_index == -1) {
           flesh_data[e.a].partition_index = CLAMP_PARTITION(i);
+          flesh_data[e.a].partition_indices = [CLAMP_PARTITION(i)];
           flesh_data[e.a].flipped = e.flipped;
         }
         has_intersection = false;
@@ -205,6 +209,7 @@ skeletal_strokes.split_polyline_horizontal = (P,
       if (fleq(P[e.b][0], x)) {
         if (flesh_data[e.b].partition_index == -1) {
           flesh_data[e.b].partition_index = CLAMP_PARTITION(i);
+          flesh_data[e.b].partition_indices = [CLAMP_PARTITION(i)];
           flesh_data[e.b].flipped = e.flipped;
         }
         has_intersection = false;
@@ -215,6 +220,7 @@ skeletal_strokes.split_polyline_horizontal = (P,
         // make sure partition are set
         if (flesh_data[e.a].partition_index == -1) {
           flesh_data[e.a].partition_index = CLAMP_PARTITION(i);
+          flesh_data[e.a].partition_indices = [CLAMP_PARTITION(i)];
           flesh_data[e.a].flipped = e.flipped;
         }
       }
@@ -225,7 +231,8 @@ skeletal_strokes.split_polyline_horizontal = (P,
         let y = (e.m == Math.inf) ? P[e.a][1] : e.m * (x - P[e.a][0]) + P[e.a][1];
         let v = FleshVertex([x, y],
           "JOINT",
-          CLAMP_PARTITION(i),
+                            CLAMP_PARTITION(i),
+                            [CLAMP_PARTITION(i)],
           i,
           e.flipped);
         v.edge_normal = N[e.i];
@@ -256,7 +263,10 @@ skeletal_strokes.split_polyline_horizontal = (P,
   // make sure we did not miss the final vertices
   let v = vlist.front;
   while (v) {
-    if (v.partition_index == -1) v.partition_index = m;
+    if (v.partition_index == -1) {
+      v.partition_index = m;
+      v.partition_indices = [m];
+    }
     v = v.next;
   }
 
@@ -270,9 +280,15 @@ skeletal_strokes.split_polyline_horizontal = (P,
         let vdup = _.clone(v);
         vlist.add(vdup, v);
         if (v.flipped) {
+          const old_ind = v.partition_index;
           v.partition_index = CLAMP_PARTITION(v.partition_index + 1);
+          v.partition_indices = [old_ind, v.partition_index];
+          vdup.partition_indices = [old_ind, v.partition_index];
         } else {
+          const old_ind = vdup.partition_index;
           vdup.partition_index = CLAMP_PARTITION(vdup.partition_index + 1);
+          vdup.partition_indices = [old_ind, vdup.partition_index];
+          v.partition_indices = [old_ind, vdup.partition_index];
         }
       }
       v = next;
@@ -378,6 +394,12 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
     let u1 = mth.mul(d1, o1 * Math.sign(alpha));  // eq 1
     let u2 = mth.mul(d2, -o2 * Math.sign(alpha));
 
+    // p5.stroke(0,255,0);
+    // p5.circle(...p, 10);
+    // p5.line(...p, ...mth.add(p, u1));
+    // p5.stroke(0,0,255);
+    // p5.line(...p, ...mth.add(p, u2));
+
     frames.push([u1, u2]);
   }
 
@@ -424,10 +446,10 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
 
     let u2_greater = mth.norm(u2o2) > mth.norm(D[ip1]);
     let u1_greater = mth.norm(u1o1) > mth.norm(D[i]);
-    if (u1_greater ||  // norm(u1) > norm(D.col(i)) ||
-        u2_greater ||  // norm(u2) > norm(D.col(i+1)) ||
+    if (u1_greater ||
+        u2_greater ||
         short_end_1 || short_end_2)
-
+    //if (false)
     {
       // use normals instead of local frame in that case
       // and use blended width
@@ -514,7 +536,7 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
     convex_side.pop();
   }
 
-  // Build prototype polygons
+  // Build prototype polygons and envelopes
   let envelopes = [];
 
   for (let i = 0; i < L.length; i += 2) {
@@ -524,13 +546,9 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
       p5.stroke(255,0,0);
       p5.polygon2(proto, true);
     }
-    //if (params.debug)
-    //  debug_draw_quad(proto);
     envelopes.push(proto);
   }
 
-  // build homographies
-  let homographies = [];
   let prototype_rects = [];
 
   let tl    = rect[0];
@@ -554,7 +572,11 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
   // compute subdivision points
   let flip_normals = false;
   let alternate_normals = false;
-  let flesh = [];
+  let res = {
+      spine: spine,
+      flesh: [],
+    flesh_vertices: [] };
+
   for (const F_ of prototype) {
     let F = norm_rec.normalize_poly(F_); //normalize_polyline(F_, rect);
     //console.log(xsub);
@@ -643,12 +665,15 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
     }  // end vertex loop
 
     //mth.print(undefined);
-    flesh.push(vlist.map(v=>v.pos));
+    res.flesh_vertices.push(vlist);
+    res.flesh.push(vlist.map(v=>v.pos));
   }
 
-  if (!compound)
-    flesh = flesh[0];
-  return flesh;
+  if (!compound){
+    res.flesh = res.flesh[0];
+    res.flesh_vertices = res.flesh_vertices[0];
+  }
+  return res;
 }
 
 const apply_miter = (b, p, d1, d2, limit) => {
