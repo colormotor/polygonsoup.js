@@ -44,6 +44,14 @@ geom.chord_length = (P, closed = 0) => {
   return mth.sum(L);
 }
 
+geom.tangents = (P, closed=False) => {
+    if (closed)
+    P = P.concat([P[0]]);
+
+  const D = mth.diff(P, 0);
+  return D;
+}
+
 geom.normals_2d = (P, closed=false, vertex=false) => {
   if (closed)
     P = P.concat([P[0]]);
@@ -68,15 +76,16 @@ geom.normals_2d = (P, closed=false, vertex=false) => {
 
 geom.turning_angles = (P, closed, all_points=false, N=[]) => {
   if (P.length <= 2) return mth.zeros(P.length);
-  if (!N.length)
-    N = geom.normals_2d(P, closed);
+  if (!N.length){
+    const D = geom.tangents(P, closed);
+    N = D.map(d=>mth.neg(mth.perp(mth.normalize(d))));
+  }
   if (closed) {
     N = [N[N.length-1]].concat(N);
   }
 
   const n = N.length;
   let A = mth.zeros(n - 1);
-
   for (let i = 0; i < n - 1; i++)
     A[i] = mth.angle_between(N[i], N[i + 1]);
 
@@ -124,6 +133,8 @@ geom.point_line_distance = (p, a, b) => {
 }
 
 geom.point_segment_distance = (p, a, b) => {
+  if (mth.distance(a, b) < mth.zero_eps)  // check for degenerate line
+    return mth.distance(a, p);
   const d = mth.sub(b, a);
   const u = mth.clamp(mth.dot(mth.sub(p, a), d) / mth.dot(d, d), 0, 1);
   const proj = mth.add(a, mth.mul(d, u));
@@ -581,30 +592,36 @@ geom.shapes.star = (cenp, r, n=5, ratio_inner=1, start_theta=0) => {
 const dp_simplify = (X, eps, distfn = geom.point_line_distance) => {
   var stack = [];
   const n = X.length;
-  stack.push([0, n - 1])
-  var flags = _.range(0, n).map(v => true)
+  stack.push([0, n - 1]);
+  var flags = _.range(0, n).map(v => true);
+  // flags[0] = true;
+  // flags[flags.length-1] = true;
 
   while (stack.length) {
+
     var [a, b] = stack.pop();
     var dmax = 0.0;
     var index = a;
 
     for (var i = a + 1; i < b; i++) {
       if (flags[i]) {
-        var d = distfn(X[i], X[a], X[b])
+        var d = distfn(X[i], X[a], X[b]);
+
         if (d > dmax) {
+          //console.log(i);
           index = i;
-          dmax = d
+          dmax = d;
         }
       }
     }
 
     if (dmax > eps) {
-      stack.push([a, index])
-      stack.push([index, b])
+      //flags[index] = true;
+      stack.push([a, index]);
+      stack.push([index, b]);
     } else {
       for (var i = a + 1; i < b; i++)
-        flags[i] = false
+        flags[i] = false;
     }
   }
   return flags;
@@ -617,12 +634,16 @@ const dp_simplify = (X, eps, distfn = geom.point_line_distance) => {
  * @param {bool} closed
  * @returns simplified polyline
  */
-geom.dp_simplify = (X, eps, closed = false, get_inds = false, distfn = geom.point_line_distance) => {
+geom.dp_simplify = (X, eps, closed = false, get_inds = false, distfn = geom.point_segment_distance) => {
   if (eps <= 0.) return ctr;
 
-  if (closed)
+  let shift = 0;
+  if (closed){
+    // with a closed polygon select the "most convex vertex" as a starting point
+    shift = geom.select_convex_vertex(X);
+    X = mth.rotate_array(X, shift);
     X = mth.vstack([X, [X[0]]]);
-
+  }
   var flags = dp_simplify(X, eps, distfn);
   var I = _.range(flags.length).filter(i => flags[i]);
   var Y = I.map(i => X[i]);
@@ -630,7 +651,6 @@ geom.dp_simplify = (X, eps, closed = false, get_inds = false, distfn = geom.poin
     Y = Y.slice(0, Y.length - 1);
     I = I.slice(0, I.length - 1);
   }
-
   if (get_inds)
     return [Y, I];
   return Y;
