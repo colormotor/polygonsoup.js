@@ -9,7 +9,7 @@
     "splaytree":"3.1.0",
     "seedrandom":"3.0.5",
     "multivariate-normal":"0.1.2",
-    "dcel.js":"shawn0326/dcel.js#master",
+    "dcel.js":"../dcel.js",
     "heapify":"0.6.0"
   },
   "exports": {
