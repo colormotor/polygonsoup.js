@@ -15,6 +15,10 @@ color.categorical = {
   [31, 119, 180],
   [255, 127, 14],
   [93, 177, 90]]
+
 };
+
+color.current = color.categorical.default12;
+color.default = (i) => color.current[i%color.current.length];
 
 module.exports = color;
