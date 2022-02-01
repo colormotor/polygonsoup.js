@@ -384,6 +384,11 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
 
   let Alpha = geom.turning_angles(P, closed, true);  // P.closed, true);
 
+  for (let i = 0; i < D.length; i++){
+    const l = mth.norm(D[i]);
+    W[i][0] = Math.min(W[i][0], l/6);
+    W[i][1] = Math.min(W[i][1], l/6);
+  }
   // Almost flat corners break with stepwise profile
   // TODO Either find a better solution or adjust based on width/angle
   let alpha_range;
@@ -469,7 +474,7 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
 
     // Nasty sign-workaround to fix for almost opposite segments
     // #pragma warning TODO fix opposite / collinear workaround
-    let ss1 = 1.;
+    let ss1 = 1;
     let ss2 = 1;
     // fix for nearly collinear or oppositely oriented segments
     let short_end_1 = false;
@@ -483,6 +488,7 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
     // (ag::pi/2); //std::min(Math.abs(alpha) / (ag::pi/2), 1.)*sign(alpha);
     let sigma        = params.fold_angle_sigma;
     let fold_ang_amt = 1. - Math.exp(-(alpha * alpha) / (sigma * sigma));
+    //let fold_ang_amt = 1-Math.sin(Math.abs(alpha)/2);
     // std::cout << "fold_amt: " << sigma << std::endl;
     let unfold = params.unfold;
 
@@ -493,14 +499,13 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
     if (u1_greater ||
         u2_greater ||
         short_end_1 || short_end_2)
-    //if (false)
     {
       // use normals instead of local frame in that case
       // and use blended width
       let n  = mth.mul(mth.normalize(mth.add(N[ip1], N[i])), Math.sign(alpha));
-      unfold = true;
-      let b      = mth.mul(n, Math.max(W[i][0], W[ip1, 0]));
 
+      unfold = true;
+      b      = mth.mul(n, Math.max(W[i][0], W[ip1][0]));
       fold_ang_amt = 0;
       if (Math.abs(alpha) > Math.PI / 1.5) {
         // oppositely oriented apply sign workaround
@@ -509,11 +514,22 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
         // so we consider the perpendicular to the bisector here
         // std::cout << "opposing sign" << std::endl;
         n   = mth.mul(mth.perp(mth.normalize(mth.add(u1o1, u2o2))), Math.sign(alpha));
+
         b   = mth.mul(n, Math.max(W[i][0], W[ip1][0]));
+        
         ss1 = -1;
         ss2 = 1;
+        
       }
     }
+
+     if (debug){
+      p5.noFill();
+      p5.stroke(0,255,0);
+      p5.line(...p, ...mth.add(p, b));
+      p5.line(...p, ...mth.sub(p, b));
+
+     }
 
 // #if AG_DEBUG_DRAW
 //     if (params.debug_draw) {
@@ -522,13 +538,7 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
 //       gfx::drawLine(p, p - b);
 //     }
 // #endif
-    // if (debug){
-    //   p5.noFill();
-    //   p5.stroke(0,255,0);
-    //   p5.line(...p, ...mth.add(p, b));
-    //   p5.line(...p, ...mth.sub(p, b));
-
-    // }
+   
 //     // Mitering
     let limit = Math.max(W[i][1], W[ip1][0]) * params.miter_limit;
     let    d1    = D[i];
@@ -760,7 +770,6 @@ const apply_miter = (b, p, d1, d2, limit) => {
                             p2b);
 
   const bb = [mth.sub(bp1, p), mth.sub(bp2, p)];
-  mth.has_nan(bb);
   return bb;
 }
 
