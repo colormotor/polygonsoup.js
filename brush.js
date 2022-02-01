@@ -1,3 +1,24 @@
+/**
+ *  ______ _______ _____  ___ ___ _______ _______ _______ _______ _______ _______ ______          _____ _______
+ * |   __ \       |     ||   |   |     __|       |    |  |     __|       |   |   |   __ \______ _|     |     __|
+ * |    __/   -   |       \     /|    |  |   -   |       |__     |   -   |   |   |    __/______|       |__     |
+ * |___|  |_______|_______||___| |_______|_______|__|____|_______|_______|_______|___|         |_______|_______|
+ *
+ * © Daniel Berio (@colormotor) 2021 - ...
+ *
+ * Speed based brush dabbing method. Extends the method described in
+ * @inproceedings {BerioEG2018
+ * booktitle = {EG 2018 - Short Papers},
+ * editor = {Diamanti, Olga and Vaxman, Amir},
+ * title = {{Expressive Curve Editing with the Sigma Lognormal Model}},
+ * author = {Berio, Daniel and Leymarie, Frederic Fol and Plamondon, RÃ©jean},
+ * year = {2018},
+ * publisher = {The Eurographics Association}
+ * }
+ *
+ **/
+
+
 "use strict"
 
 const mth = require('./mth.js');

@@ -76,7 +76,9 @@ alg.astar = (G, start, goal, dist=(n)=>1, heuristic=(n)=>0) => {
   return null;
 }
 
-
+/** (Hacky) Doubly linked list
+ *  using objects with a "next/prev" interface
+ **/
 alg.DoublyLinkedList = function() {
   this.front = null;
   this.back = null;

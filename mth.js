@@ -537,7 +537,15 @@ mth.kron = (a, b) => {
   }) && t
 }
 
-
+/**
+ * Dynamic time warping (DTW) between two sequences
+ * @param {any} x first sequence
+ * @param {any} y second sequrence
+ * @param {any} w maximum window size
+ * @param {any} get_dist if true get DTW get distance
+ * @param {any} distfn distance function
+ * @returns returns the optimal path between the sequences and optionallly the distance
+ */
 mth.dtw = (x, y, w = Infinity, get_dist = false, distfn = mth.dist2sq) => {
   const nx = x.length;
   const ny = y.length;

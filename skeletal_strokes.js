@@ -1,3 +1,29 @@
+/**
+ *  ______ _______ _____  ___ ___ _______ _______ _______ _______ _______ _______ ______          _____ _______
+ * |   __ \       |     ||   |   |     __|       |    |  |     __|       |   |   |   __ \______ _|     |     __|
+ * |    __/   -   |       \     /|    |  |   -   |       |__     |   -   |   |   |    __/______|       |__     |
+ * |___|  |_______|_______||___| |_______|_______|__|____|_______|_______|_______|___|         |_______|_______|
+ *
+ * © Daniel Berio (@colormotor) 2021 - ...
+ *
+ * Polygonal skeletal strokes based on
+ *
+ * @inproceedings{BerioExpressive2019,
+ *  author = {Berio, Daniel and Asente, Paul and Echevarria, Jose and Fol Leymarie, Frederic},
+ *  title = {Sketching and Layering Graffiti Primitives},
+ *  year = {2019},
+ *  publisher = {Eurographics Association},
+ *  address = {Goslar, DEU},
+ *  doi = {10.2312/exp.20191076},
+ *  booktitle = {Proceedings of the 8th ACM/Eurographics Expressive Symposium on Computational Aesthetics and Sketch Based Interfaces and Modeling and Non-Photorealistic Animation and Rendering},
+ *  pages = {51â€“59},
+ *  numpages = {9},
+ *  location = {Genoa, Italy},
+ *  series = {Expressive '19}
+ *
+ *  }
+ **/
+
 "use strict"
 const alg = require("./alg.js");
 const geom = require("./geom.js");
@@ -110,14 +136,6 @@ skeletal_strokes.split_polyline_horizontal = (P,
     ET.push(Edge(i, a, b, m, flip));
   }
 
-  // sort by increasing x of first point
-  // ET.sort((a, b) => {
-  //   if (fequal(P[a.a][0], P[b.a][0]))
-  //     return 0;
-  //   if (P[a.a][0] < P[b.a][0])
-  //     return -1;
-  //   return 1;
-  // });
   ET.sort((a,b)=>compare_nums(P[a.a][0], P[b.a][0]));
 
   let AET = [];  // active edge table
@@ -138,7 +156,6 @@ skeletal_strokes.split_polyline_horizontal = (P,
   // Scan horizontal subdivisions
   // First sort horizontally and remove boundary segments (it might be a good
   // idea to add this as a flag?)
-
     let xs_sorted = [...xs].sort((a,b)=>compare_nums(a,b));
 
   let m;
@@ -167,17 +184,8 @@ skeletal_strokes.split_polyline_horizontal = (P,
 
     if (c < ET.length)
       ET = ET.slice(c);
-    // for (var j = 0; j < c; j++)
-    //   if (ET.length) ET.shift();
 
     // sort AET according to second point
-    // AET.sort((a, b) => {
-    //   if (fequal(P[a.b][0], P[b.b][0]))
-    //     return 0;
-    //   if (P[a.b][0] < P[b.b][0])
-    //     return -1;
-    //   return 1;
-    // });
     AET.sort((a,b)=>compare_nums(P[a.b][0], P[b.b][0]));
     //AET = AET.filter(e=>P[e.b][1] >= x);
 
@@ -254,14 +262,6 @@ skeletal_strokes.split_polyline_horizontal = (P,
 
 
     AET = AET.filter(e=>P[e.b][0] >= x);
-    // // Remove passed edges from AEt
-    // for (const e of AET) {
-    //   if (fless(P[e.b][0], x)) {
-    //     AET.shift();
-    //   } else {
-    //     break;
-    //   }
-    // }
   }
 
   // make sure we did not miss the final vertices
@@ -374,7 +374,6 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
   if (mth.dim(width_profile).length < 2)
     W = _.range(0, W.length-1).map(i=>[W[i], W[i+1]]);
   W = mth.mul(W, geom.rect_h(rect));
-
 
   //const edges = geom.edges(P, closed); // TODO closed
 
@@ -514,7 +513,6 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
         // so we consider the perpendicular to the bisector here
         // std::cout << "opposing sign" << std::endl;
         n   = mth.mul(mth.perp(mth.normalize(mth.add(u1o1, u2o2))), Math.sign(alpha));
-
         b   = mth.mul(n, Math.max(W[i][0], W[ip1][0]));
         
         ss1 = -1;
@@ -841,7 +839,5 @@ const NormalizeRec = (rect) => {
           unnormalize_poly: (P) => P.map(p=>mth.madd(p, w, x0))
          };
 };
-
-
 
 module.exports = skeletal_strokes;
