@@ -213,6 +213,10 @@ const affine_transform = (mat, data) => {
 geom.affine_transform = affine_transform;
 geom.affine = affine_transform;
 
+geom.centroid = (P) => {
+  return mth.mean(P, 0);
+}
+
 geom.bounding_box = (S, padding = 0) => {
   /// Axis ligned bounding box of one or more contours (any dimension)
   // Returns [min,max] list'''
@@ -462,15 +466,22 @@ geom.is_point_in_polygon = (p, P) => {
 }
 
 /// Even odd point in shape
-geom.is_point_in_shape = (p, S) => {
+geom.is_point_in_shape = (p, S, get_flags=false) => {
   let c = 0;
   let flags = [];
-  for (const P of S)
-    if (geom.is_point_in_polygon(p, P))
+  for (const P of S){
+    if (geom.is_point_in_polygon(p, P)){
       c = c+1;
-
-    return (c%2) == 1;
+      flags.push(true);
+    }else{
+      flags.push(false);
+    }
   }
+  const res = (c%2) == 1;
+  if (get_flags)
+    return [res, flags];
+  return res;
+}
 
 geom.polygon_area = (P) => {
   if (P.length < 3)
@@ -521,6 +532,10 @@ geom.get_point_in_polygon = (P, area=null) => {
   if (area==null)
     area = geom.polygon_area(P);
   let v = geom.select_convex_vertex(P, area);
+  if (isNaN(v)){
+    console.log('no convex vert');
+    return null;
+  }
   let [a, b] = [mth.imod(v-1, n), (v+1)%n];
   let inside = [];
   let dist = Infinity;
@@ -782,6 +797,7 @@ geom.schematize = (P_, C, angle_offset, closed = false, get_edge_inds = false, m
     // continue;
 
     if (prev != null) {
+
       const [res, ins] = geom.line_intersection([b_prev, mth.add(b_prev, d_prev)], [b, mth.add(b, d)]);
       if (res) {
         Q.push(ins);
@@ -802,14 +818,32 @@ geom.schematize = (P_, C, angle_offset, closed = false, get_edge_inds = false, m
   edge_inds.push(blocks.back.edge_index);
   // FIXME
   if (closed && Q.length > 2) {
-    // Q = geom.cleanup_contour(Q, true, 0.01);
-    // const [res, ins] = geom.line_intersection([Q[0], Q[1]], [Q[Q.length - 1], Q[Q.length - 2]])
-    // if (res && mth.distance(ins, Q[0])<100) {
+    Q = geom.cleanup_contour(Q, false, 0.001);
+    let dists = [];
+    let intersections = [];
+    for (d of N) {
+      const [res, ins] = geom.line_intersection([Q[0], Q[1]], [Q[Q.length - 1], mth.add(Q[Q.length - 1], d)]); // Q[Q.length - 2]]);
+      if (res){
+        dists.push(mth.distance(ins, Q[0]));
+        intersections.push(ins);
+      }
+    }
+    if (intersections.length){
+      console.log(dists);
+      let ins = intersections[mth.argmin(dists)];
+      //Q[0] = ins;
+      Q = geom.cleanup_contour(Q, true, 0.001);
+
+    }
+
+    // if (res && mth.distance(ins, Q[0])<1000) {
     //   Q[0] = ins;
     //   Q[Q.length - 1] = ins;
+    // }else{
+    //   console.log(mth.distance(ins, Q[0]));
     // }
-     //Q = Q.slice(0, Q.length-1)
-     //edge_inds = edge_inds.slice(0, edge_inds.length-1)
+    //Q = Q.slice(0, Q.length-1)
+    //edge_inds = edge_inds.slice(0, edge_inds.length-1)
   }
   if (get_edge_inds)
     return [Q, edge_inds];
