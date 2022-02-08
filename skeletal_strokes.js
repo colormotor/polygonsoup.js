@@ -143,7 +143,11 @@ skeletal_strokes.split_polyline_horizontal = (P,
   let flesh_data = [];
   let vlist = new alg.DoublyLinkedList();
   for (let i = 0; i < P.length; i++) {
-    flesh_data.push(FleshVertex(P[i]));
+    let v = FleshVertex(P[i]);
+    if (fequal(v.pos[0], 0)){
+      v.type = "START";
+    }
+    flesh_data.push(v);
 
     if (i < N.length)
       flesh_data[i].edge_normal = N[i];
@@ -383,11 +387,11 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
 
   let Alpha = geom.turning_angles(P, closed, true);  // P.closed, true);
 
-  for (let i = 0; i < D.length; i++){
-    const l = mth.norm(D[i]);
-    W[i][0] = Math.min(W[i][0], l/6);
-    W[i][1] = Math.min(W[i][1], l/6);
-  }
+  // for (let i = 0; i < D.length; i++){
+  //   const l = mth.norm(D[i]);
+  //   W[i][0] = Math.min(W[i][0], l/6);
+  //   W[i][1] = Math.min(W[i][1], l/6);
+  // }
   // Almost flat corners break with stepwise profile
   // TODO Either find a better solution or adjust based on width/angle
   let alpha_range;
@@ -395,11 +399,11 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
     alpha_range = _.range(0, Alpha.length);
   else
     alpha_range = _.range(1, W.length);
-  for (const i of alpha_range) {
-    if (Math.abs(Alpha[i]) < mth.radians(20)){
-      W[mth.imod(i-1, W.length)][1] = W[i][0];
-    }
-  }
+  // for (const i of alpha_range) {
+  //   if (Math.abs(Alpha[i]) < mth.radians(20)){
+  //     W[mth.imod(i-1, W.length)][1] = W[i][0];
+  //   }
+  // }
   //console.log([D.length, W.length, Alpha.length])
   if (mth.has_nan(Alpha))
     console.log( "NaN turning angle" );
@@ -498,13 +502,19 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
     if (u1_greater ||
         u2_greater ||
         short_end_1 || short_end_2)
+    //if (false)
     {
       // use normals instead of local frame in that case
       // and use blended width
       let n  = mth.mul(mth.normalize(mth.add(N[ip1], N[i])), Math.sign(alpha));
 
       unfold = true;
-      b      = mth.mul(n, Math.max(W[i][0], W[ip1][0]));
+      const maxl = 100;
+      if (mth.norm(b) > maxl)
+        b      = mth.mul(n, Math.max(W[i][0], W[ip1][0]));
+      //b = mth.mul(mth.normalize(b), maxl);
+        //console.log('problem');
+      // b      = mth.mul(n, Math.max(W[i][0], W[ip1][0]));
       fold_ang_amt = 0;
       if (Math.abs(alpha) > Math.PI / 1.5) {
         // oppositely oriented apply sign workaround
@@ -700,6 +710,11 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
         let d  = mth.add(mth.normalize(mth.neg(D[mth.imod(v.spine_index - 1, m)])),
                          mth.normalize(D[mth.imod(v.spine_index, m)]));
 
+        if (v.loop_point)
+        {
+          v.partition_index = envelopes.length-1;
+          v.partition_indices = [v.partition_index];
+        }
 
         if (mth.dot(d, v.edge_normal) > 0) {
           v.concave = true;
@@ -718,6 +733,7 @@ skeletal_strokes.stroke = (prototype, spine, width_profile, closed=false, rect=n
           v.spine_index = pind;
         else
           v.spine_index = (pind + 1) % (m + 1);
+
 
         if (vi == 0) v.spine_index = 0;
         if (vi == vlist.length - 1) v.spine_index = spine.length - 1;
