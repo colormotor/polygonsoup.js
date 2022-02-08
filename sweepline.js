@@ -26,6 +26,8 @@ const sweepline = function() { }
 const fequal = (a, b, eps = 1e-5) => Math.abs(a - b) <= eps;
 const fleq = (a, b) => fequal(a, b) || a < b;
 const fgeq = (a, b) => fequal(a, b) || a > b;
+const fgreater = (a, b) => (!fequal(a,b) && a > b);
+const fless = (a, b) => (!fequal(a,b) && a < b);
 
 const to_point = (p) => [p[0], p[1]]
 const make_isegment = (s) => [[...s[0], 1], [...s[1], 1]]
@@ -424,8 +426,9 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
       if (X.find(ins)) {
       // again must always use fuzzy equalities or things will go wrong with nearly horizontal segments
       //} else if (ins[1] > p[1] || (fequal(ins[1], p[1]) && ins[0] > p[0])) {
-      } else if ((!fequal(ins[1], p[1]) && ins[1] > p[1]) ||
-                  (fequal(ins[1], p[1]) && ins[0] > p[0])) {
+      } else if (fequal(ins[1], p[1]) && fgeq(ins[0], p[0]) || fgeq(ins[1], p[1])){
+      // } else if ((!fequal(ins[1], p[1]) && ins[1] > p[1]) ||
+      //             (fequal(ins[1], p[1]) && ins[0] > p[0])) {
         X.insert(ins, {S:new Set(), E:new Set(), id:event_id++});
         return true;
       }
@@ -482,6 +485,8 @@ sweepline.sweepline_intersections = (segs, avoid_incident_endpoints = true, debu
     }
 
     return theta_segments.sort((a, b) => {
+      // if (fequal(a.theta, b.theta))
+      //     return 0;
       if (a.theta < b.theta)
         return -1;
       if (a.theta > b.theta)
