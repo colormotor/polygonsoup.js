@@ -58,14 +58,15 @@ mth.erf = (x) => {
     return sign*y;
 }
 
-mth.gaussian = (mean, stddev) => {
+
+mth.gaussian = (mean, stddev, randf=mth.rand) => {
     return function() {
         var V1
         var V2
         var S
         do{
-          var U1 = mth.rand();
-            var U2 = mth.rand()
+          var U1 = randf;
+          var U2 = randf;
             V1 = 2*U1-1
             V2 = 2*U2-1
             S = V1*V1+V2*V2
@@ -76,16 +77,51 @@ mth.gaussian = (mean, stddev) => {
 }
 
 mth.multivariate_gaussian = (mean, cov) => {
-  console.log(mvn);
   let distribution = mvn(mean, cov);
   return distribution.sample;
 }
 
 
 mth.randint = (min, max) => Math.floor(mth.rand() * (max - min) ) + min;
-mth.random_choice = (ar) => ar[mth.randint(0, ar.length)]
+mth.random_choice = (ar) => ar[mth.randint(0, ar.length)];
 
 mth.clamp = (num, min, max) => Math.min(Math.max(num, min), max);
+mth.clip = mth.clamp
+
+mth.compare_nums = (a, b) => {
+  return a - b;
+}
+
+mth.uniform = (a = 0.0, b = 1.0, n = 1) => {
+  if (n == 1)
+    return a + mth.rand() * (b - a);
+  let v = new ArrayT(n);
+  for (var i = 0; i < n; i++)
+    v[i] = mth.uniform(a, b);
+  return v;
+}
+
+mth.shuffled = (array) => {
+  array = array.slice(0);
+    for (let i = array.length - 1; i > 0; i--) {
+        let j = Math.floor(mth.rand() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+  return array;
+}
+
+const gauss1 = mth.gaussian(0, 1);
+
+mth.random = {
+  seed: (n) => mth.random_seed(n),
+  uniform: (a = 0.0, b = 1.0, n = 1) => mth.uniform(a, b, n),
+  normal: (range=1, n=1) => {
+    if (n==1)
+      return gauss1()*range;
+    return _.range(0, n).map(i=>gauss1()*range);
+  },
+  choice: (ar) => mth.random_choice(ar)
+};
 
 const ArrayT = Array; // Float64Array;
 // Rare docs for numericjs
@@ -138,7 +174,7 @@ const ones = (nrow, ncol = 0) => {
   if (ncol == 0) {
     var x = new ArrayT(nrow);
     for (var i = 0; i < nrow; i++)
-      x[i] = 1.0;
+      x[i] = 1;
     return x;
   }
 
@@ -150,7 +186,7 @@ const zeros = (nrow, ncol = 0) => {
   if (ncol == 0) {
     var x = new ArrayT(nrow);
     for (var i = 0; i < nrow; i++)
-      x[i] = 0.0;
+      x[i] = 0;
     return x;
   }
 
@@ -299,23 +335,6 @@ mth.print = (v, txt = "") => {
   console.log(s);
 }
 
-mth.uniform = (a = 0.0, b = 1.0, n = 1) => {
-  if (n == 1)
-    return a + mth.rand() * (b - a);
-  let v = new ArrayT(n);
-  for (var i = 0; i < n; i++)
-    v[i] = mth.uniform(a, b);
-  return v;
-}
-
-mth.shuffled = (array) => {
-  array = array.slice(0);
-    for (let i = array.length - 1; i > 0; i--) {
-        let j = Math.floor(mth.rand() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-  return array;
-}
 
 const sum1 = mth.sum;
 mth.sum = (x, axis = -1) => {
@@ -401,6 +420,12 @@ mth.argmin = mth.argfact((max, el) => (el[0] < max[0] ? el : max))
 
 mth.imod = (n, m) => {
   return ((n % m) + m) % m;
+}
+
+mth.argsort = (x) => {
+  let I = _.range(0, x.length);
+  I.sort((i,j)=>mth.compare_nums(x[i], x[j]));
+  return I;
 }
 
 // mth.factorial = (num) => {
