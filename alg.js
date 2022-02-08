@@ -29,6 +29,36 @@ const permutations = (a) => {
 }
 alg.permutations = permutations;
 
+/// From https://www.nayuki.io/page/next-lexicographical-permutation-algorithm
+alg.next_permutation = (array) => {
+  // Find non-increasing suffix
+  var i = array.length - 1;
+  while (i > 0 && array[i - 1] >= array[i])
+    i--;
+  if (i <= 0)
+    return false;
+
+  // Find successor to pivot
+  var j = array.length - 1;
+  while (array[j] <= array[i - 1])
+    j--;
+  var temp = array[i - 1];
+  array[i - 1] = array[j];
+  array[j] = temp;
+
+  // Reverse suffix
+  j = array.length - 1;
+  while (i < j) {
+    temp = array[i];
+    array[i] = array[j];
+    array[j] = temp;
+    i++;
+    j--;
+  }
+	return true;
+}
+
+
 /**
  * A^* path finding.
  * @param {any} G graph (assumed to be graphology graph https://github.com/graphology/graphology)
