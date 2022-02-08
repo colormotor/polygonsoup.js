@@ -8,7 +8,7 @@
     "avl":"1.5.3",
     "splaytree":"3.1.0",
     "seedrandom":"3.0.5",
-    "multivariate-normal":"0.1.2",
+    "multivariate-normal":"3.3.1",
     "dcel.js":"../dcel.js",
     "heapify":"0.6.0"
   },
